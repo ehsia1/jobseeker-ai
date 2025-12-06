@@ -1,0 +1,263 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Run smoke tests every 6 hours
+    - cron: '0 */6 * * *'
+
+env:
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '18'
+
+jobs:
+  # Backend Tests
+  backend-tests:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: jobseeker_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-test.txt
+      
+      - name: Run linting
+        run: |
+          flake8 backend --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 backend --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+      
+      - name: Run unit tests
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/jobseeker_test
+          REDIS_URL: redis://localhost:6379
+          SECRET_KEY: test-secret-key
+          ENVIRONMENT: test
+        run: |
+          pytest tests/backend/unit -v --cov=backend --cov-report=xml
+      
+      - name: Run integration tests
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/jobseeker_test
+          REDIS_URL: redis://localhost:6379
+          SECRET_KEY: test-secret-key
+          ENVIRONMENT: test
+        run: |
+          pytest tests/backend/integration -v
+      
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          flags: backend
+          name: backend-coverage
+
+  # Frontend Tests
+  frontend-tests:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/web/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: frontend/web
+        run: npm ci
+      
+      - name: Run linting
+        working-directory: frontend/web
+        run: npm run lint
+      
+      - name: Run unit tests
+        working-directory: frontend/web
+        run: npm test -- --coverage
+      
+      - name: Build application
+        working-directory: frontend/web
+        run: npm run build
+      
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./frontend/web/coverage/lcov.info
+          flags: frontend
+          name: frontend-coverage
+
+  # Chaos Tests (Free Tier Limits)
+  chaos-tests:
+    name: Chaos Tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'push'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-test.txt
+      
+      - name: Run Redis exhaustion test
+        run: pytest tests/backend/chaos/test_redis_exhaustion.py -v
+      
+      - name: Run database size limit test
+        run: pytest tests/backend/chaos/test_database_limits.py -v
+
+  # Smoke Tests
+  smoke-tests:
+    name: Smoke Tests
+    runs-on: ubuntu-latest
+    needs: [backend-tests, frontend-tests]
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run smoke tests
+        run: |
+          chmod +x tests/scripts/smoke_test.sh
+          API_URL=${{ secrets.API_URL || 'http://localhost:8000' }} \
+          FRONTEND_URL=${{ secrets.FRONTEND_URL || 'http://localhost:3000' }} \
+          ./tests/scripts/smoke_test.sh
+
+  # Deploy to Staging
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [backend-tests, frontend-tests]
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Deploy Backend to Render (Staging)
+        run: |
+          echo "Deploying backend to Render staging..."
+          # Add Render deployment commands here
+      
+      - name: Deploy Frontend to Vercel (Staging)
+        run: |
+          echo "Deploying frontend to Vercel staging..."
+          # Add Vercel deployment commands here
+
+  # Deploy to Production
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [smoke-tests]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: production
+      url: https://jobseeker.ai
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Deploy Backend to Render
+        run: |
+          echo "Deploying backend to Render production..."
+          # curl -X POST https://api.render.com/deploy/srv-xxx?key=${{ secrets.RENDER_DEPLOY_KEY }}
+      
+      - name: Deploy Frontend to Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          echo "Deploying frontend to Vercel production..."
+          # npx vercel --prod --token=$VERCEL_TOKEN
+      
+      - name: Run production smoke tests
+        run: |
+          sleep 30  # Wait for deployment
+          chmod +x tests/scripts/smoke_test.sh
+          API_URL=https://api.jobseeker.ai \
+          FRONTEND_URL=https://jobseeker.ai \
+          ./tests/scripts/smoke_test.sh
+      
+      - name: Notify deployment
+        if: success()
+        run: |
+          echo "✅ Successfully deployed to production!"
+          # Add Slack/Discord notification here
+      
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "❌ Deployment failed, initiating rollback..."
+          # Add rollback commands here
+
+  # Monitor Free Tier Usage
+  monitor-free-tier:
+    name: Monitor Free Tier Usage
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Check Redis usage
+        run: |
+          echo "Checking Redis command usage..."
+          # Add monitoring script here
+      
+      - name: Check database size
+        run: |
+          echo "Checking Supabase database size..."
+          # Add monitoring script here
+      
+      - name: Check Render usage
+        run: |
+          echo "Checking Render hours remaining..."
+          # Add monitoring script here
+      
+      - name: Alert if limits approaching
+        run: |
+          echo "Checking if any limits are approaching..."
+          # Add alerting logic here

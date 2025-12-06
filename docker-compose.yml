@@ -1,0 +1,116 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: jobseeker-postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-jobseeker}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-jobseeker123}
+      POSTGRES_DB: ${DB_NAME:-jobseeker_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/docker/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-jobseeker}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: jobseeker-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: jobseeker-chromadb
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      IS_PERSISTENT: TRUE
+      PERSIST_DIRECTORY: /chroma/chroma
+      ANONYMIZED_TELEMETRY: FALSE
+
+  backend:
+    build:
+      context: .
+      dockerfile: ./infrastructure/docker/Dockerfile.backend
+    container_name: jobseeker-backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:-jobseeker}:${DB_PASSWORD:-jobseeker123}@postgres:5432/${DB_NAME:-jobseeker_db}
+      REDIS_URL: redis://redis:6379
+      CHROMA_HOST: chromadb
+      CHROMA_PORT: 8000
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend:/app/backend
+      - ./data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      chromadb:
+        condition: service_started
+    command: uvicorn backend.api.main:app --host 0.0.0.0 --port 8080 --reload
+
+  celery:
+    build:
+      context: .
+      dockerfile: ./infrastructure/docker/Dockerfile.backend
+    container_name: jobseeker-celery
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:-jobseeker}:${DB_PASSWORD:-jobseeker123}@postgres:5432/${DB_NAME:-jobseeker_db}
+      REDIS_URL: redis://redis:6379
+      CHROMA_HOST: chromadb
+      CHROMA_PORT: 8000
+    volumes:
+      - ./backend:/app/backend
+      - ./data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A backend.workers.celery_app worker --loglevel=info
+
+  celery-beat:
+    build:
+      context: .
+      dockerfile: ./infrastructure/docker/Dockerfile.backend
+    container_name: jobseeker-celery-beat
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:-jobseeker}:${DB_PASSWORD:-jobseeker123}@postgres:5432/${DB_NAME:-jobseeker_db}
+      REDIS_URL: redis://redis:6379
+    volumes:
+      - ./backend:/app/backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A backend.workers.celery_app beat --loglevel=info
+
+volumes:
+  postgres_data:
+  redis_data:
+  chroma_data:
+
+networks:
+  default:
+    name: jobseeker-network

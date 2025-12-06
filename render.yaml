@@ -1,0 +1,47 @@
+# Render.com deployment configuration for JobSeeker AI
+# This runs completely free on Render's free tier
+
+services:
+  # Backend API Service
+  - type: web
+    name: jobseeker-api
+    runtime: python
+    buildCommand: |
+      pip install -r requirements.txt
+    startCommand: |
+      uvicorn backend.api.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: jobseeker-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: REDIS_URL
+        value: "redis://default:YOUR_UPSTASH_PASSWORD@YOUR_UPSTASH_URL:6379"
+      - key: ALLOWED_ORIGINS
+        value: "https://jobseeker-ai.vercel.app,https://jobseeker-ai.com"
+      - key: DEBUG
+        value: "false"
+      - key: LOG_LEVEL
+        value: "INFO"
+      # Free tier optimizations
+      - key: CACHE_TTL_HOURS
+        value: "6"
+      - key: MAX_JOBS_PER_SEARCH
+        value: "50"
+      - key: ENABLE_RATE_LIMIT
+        value: "true"
+    autoDeploy: true
+    region: oregon
+    plan: free  # Free tier - 750 hours/month
+
+# PostgreSQL Database (if using Render's DB instead of Supabase)
+databases:
+  - name: jobseeker-db
+    plan: free  # 1GB storage, 100 connections
+    postgresMajorVersion: 15
