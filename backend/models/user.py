@@ -39,6 +39,7 @@ class User(Base):
     interview_sessions = relationship("InterviewSession", back_populates="user", cascade="all, delete-orphan")
     application_timeline = relationship("ApplicationTimeline", back_populates="user", cascade="all, delete-orphan")
     application_reminders = relationship("ApplicationReminder", back_populates="user", cascade="all, delete-orphan")
+    preference_model = relationship("UserPreferenceModel", back_populates="user", uselist=False, cascade="all, delete-orphan")
 
 
 class UserProfile(Base):
@@ -53,6 +54,7 @@ class UserProfile(Base):
     # Professional info
     profession = Column(String, nullable=True)  # "software_engineer", "designer", "marketing", etc.
     job_title = Column(String, nullable=True)  # Current or desired job title
+    location = Column(String(255), nullable=True)  # User's location for matching
     
     # Skills and experience
     skills = Column(JSONB, nullable=False, default=list)  # ["python", "aws", "lambda"]
@@ -68,8 +70,8 @@ class UserProfile(Base):
     # Portfolio and assets
     portfolio = Column(JSONB, nullable=False, default=dict)  # {"github": "...", "website": "..."}
     
-    # AI embedding for profile matching - commented out for local dev
-    # profile_embedding = Column(Vector(1536))  # OpenAI ada-002 dimension
+    # AI embedding for profile matching (stored as JSONB for local dev without pgvector)
+    profile_embedding = Column(JSONB, nullable=True)  # List of floats for embedding
     
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

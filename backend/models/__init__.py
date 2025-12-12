@@ -26,6 +26,12 @@ from backend.models.application import (
     ApplicationStatus,
     ReminderType,
 )
+from backend.models.recommendation import (
+    UserPreferenceModel,
+    RecommendationLog,
+    SimilarUserCluster,
+    UserClusterMembership,
+)
 
 __all__ = [
     "User",
@@ -47,4 +53,12 @@ __all__ = [
     "InterviewQuestion",
     "InterviewType",
     "DifficultyLevel",
+    "ApplicationTimeline",
+    "ApplicationReminder",
+    "ApplicationStatus",
+    "ReminderType",
+    "UserPreferenceModel",
+    "RecommendationLog",
+    "SimilarUserCluster",
+    "UserClusterMembership",
 ]

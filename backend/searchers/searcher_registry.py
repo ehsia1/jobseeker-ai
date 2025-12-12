@@ -1,4 +1,4 @@
-"""Registry for selecting appropriate job searchers based on profession."""
+"""Registry for selecting appropriate job searchers based on profession and industry."""
 
 from typing import List, Dict, Type
 import logging
@@ -13,6 +13,13 @@ from backend.searchers.angellist_searcher import AngelListSearcher
 from backend.searchers.flexjobs_searcher import FlexJobsSearcher
 from backend.searchers.upwork_searcher import UpworkSearcher
 
+# Industry-specific searchers
+from backend.searchers.dice_searcher import DiceSearcher
+from backend.searchers.dribbble_searcher import DribbbleSearcher
+from backend.searchers.healthcareers_searcher import HealthCareersSearcher
+from backend.searchers.lawjobs_searcher import LawJobsSearcher
+from backend.searchers.efinancialcareers_searcher import EFinancialCareersSearcher
+
 logger = logging.getLogger(__name__)
 
 
@@ -23,14 +30,16 @@ class SearcherRegistry:
     PROFESSION_SEARCHERS: Dict[str, List[Type[BaseJobSearcher]]] = {
         # Technology roles
         "software_engineer": [
+            DiceSearcher,  # Tech-focused job board
             RemoteOKSearcher,
-            HackerNewsSearcher, 
+            HackerNewsSearcher,
             GitHubJobsSearcher,
             AngelListSearcher,
             IndeedSearcher,
             LinkedInSearcher,
         ],
         "data_scientist": [
+            DiceSearcher,
             RemoteOKSearcher,
             HackerNewsSearcher,
             AngelListSearcher,
@@ -38,6 +47,7 @@ class SearcherRegistry:
             LinkedInSearcher,
         ],
         "devops": [
+            DiceSearcher,
             RemoteOKSearcher,
             HackerNewsSearcher,
             GitHubJobsSearcher,
@@ -54,6 +64,7 @@ class SearcherRegistry:
         
         # Creative roles
         "designer": [
+            DribbbleSearcher,  # Design-focused job board
             AngelListSearcher,
             RemoteOKSearcher,
             FlexJobsSearcher,
@@ -120,27 +131,52 @@ class SearcherRegistry:
         
         # Finance & Accounting
         "accountant": [
+            EFinancialCareersSearcher,  # Finance-focused job board
             IndeedSearcher,
             LinkedInSearcher,
             FlexJobsSearcher,
             UpworkSearcher,
         ],
         "finance": [
+            EFinancialCareersSearcher,
             IndeedSearcher,
             LinkedInSearcher,
             AngelListSearcher,
         ],
+        "investment_banking": [
+            EFinancialCareersSearcher,
+            IndeedSearcher,
+            LinkedInSearcher,
+        ],
+        "quantitative_analyst": [
+            EFinancialCareersSearcher,
+            DiceSearcher,
+            IndeedSearcher,
+            LinkedInSearcher,
+        ],
         
         # Healthcare
         "healthcare": [
+            HealthCareersSearcher,  # Healthcare-focused job board
             IndeedSearcher,
             LinkedInSearcher,
             FlexJobsSearcher,
         ],
         "nurse": [
+            HealthCareersSearcher,
             IndeedSearcher,
             LinkedInSearcher,
             FlexJobsSearcher,
+        ],
+        "physician": [
+            HealthCareersSearcher,
+            IndeedSearcher,
+            LinkedInSearcher,
+        ],
+        "medical_technician": [
+            HealthCareersSearcher,
+            IndeedSearcher,
+            LinkedInSearcher,
         ],
         
         # Education
@@ -172,15 +208,28 @@ class SearcherRegistry:
         
         # Legal
         "legal": [
+            LawJobsSearcher,  # Legal-focused job board
             IndeedSearcher,
             LinkedInSearcher,
             FlexJobsSearcher,
             UpworkSearcher,
         ],
+        "attorney": [
+            LawJobsSearcher,
+            IndeedSearcher,
+            LinkedInSearcher,
+        ],
         "paralegal": [
+            LawJobsSearcher,
             IndeedSearcher,
             LinkedInSearcher,
             FlexJobsSearcher,
+        ],
+        "compliance": [
+            LawJobsSearcher,
+            EFinancialCareersSearcher,
+            IndeedSearcher,
+            LinkedInSearcher,
         ],
         
         # Freelance/Consultant (any field)
