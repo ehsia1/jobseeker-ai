@@ -14,6 +14,18 @@ from backend.models.subscription import (
     TIER_LIMITS,
     TIER_PRICING,
 )
+from backend.models.interview import (
+    InterviewSession,
+    InterviewQuestion,
+    InterviewType,
+    DifficultyLevel,
+)
+from backend.models.application import (
+    ApplicationTimeline,
+    ApplicationReminder,
+    ApplicationStatus,
+    ReminderType,
+)
 
 __all__ = [
     "User",
@@ -31,4 +43,8 @@ __all__ = [
     "UsageActionType",
     "TIER_LIMITS",
     "TIER_PRICING",
+    "InterviewSession",
+    "InterviewQuestion",
+    "InterviewType",
+    "DifficultyLevel",
 ]

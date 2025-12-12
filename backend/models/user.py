@@ -36,6 +36,9 @@ class User(Base):
     job_matches = relationship("JobMatch", back_populates="user", cascade="all, delete-orphan")
     feedback = relationship("UserFeedback", back_populates="user", cascade="all, delete-orphan")
     notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
+    interview_sessions = relationship("InterviewSession", back_populates="user", cascade="all, delete-orphan")
+    application_timeline = relationship("ApplicationTimeline", back_populates="user", cascade="all, delete-orphan")
+    application_reminders = relationship("ApplicationReminder", back_populates="user", cascade="all, delete-orphan")
 
 
 class UserProfile(Base):

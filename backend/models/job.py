@@ -65,6 +65,7 @@ class Job(Base):
     
     # Relationships
     matches = relationship("JobMatch", back_populates="job", cascade="all, delete-orphan")
+    interview_sessions = relationship("InterviewSession", back_populates="job")
     
     @property
     def rate_range_text(self) -> str:
@@ -142,6 +143,8 @@ class JobMatch(Base):
     user = relationship("User", back_populates="job_matches")
     job = relationship("Job", back_populates="matches")
     feedback = relationship("UserFeedback", back_populates="match", cascade="all, delete-orphan")
+    timeline_entries = relationship("ApplicationTimeline", back_populates="job_match", cascade="all, delete-orphan", order_by="ApplicationTimeline.created_at")
+    reminders = relationship("ApplicationReminder", back_populates="job_match", cascade="all, delete-orphan")
     
     @property
     def semantic_score(self) -> float:

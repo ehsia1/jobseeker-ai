@@ -15,7 +15,7 @@ except ImportError:
 
 from backend.config import settings
 from backend.database import init_db, close_db
-from backend.api.routes import auth, users, jobs, matches, feedback, health, ingestion, matching, jd_parser, proposals, resume, subscription
+from backend.api.routes import auth, users, jobs, matches, feedback, health, ingestion, matching, jd_parser, proposals, resume, subscription, interview, applications
 
 
 @asynccontextmanager
@@ -81,6 +81,8 @@ app.include_router(jd_parser.router, prefix="/jd", tags=["JD Parser"])
 app.include_router(proposals.router, prefix="/proposals", tags=["Proposals"])
 app.include_router(resume.router, prefix="/resume", tags=["Resume"])
 app.include_router(subscription.router, prefix="/subscription", tags=["Subscription"])
+app.include_router(interview.router, prefix="/interview", tags=["Interview Coaching"])
+app.include_router(applications.router, prefix="/applications", tags=["Applications"])
 
 
 @app.get("/")
