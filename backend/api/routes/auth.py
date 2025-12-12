@@ -89,10 +89,13 @@ async def get_current_user(
 
 
 async def authenticate_user(db: AsyncSession, username: str, password: str) -> User | None:
-    """Authenticate user with username and password."""
-    
+    """Authenticate user with username/email and password."""
+
+    # Try to find user by username OR email (frontend sends email as username)
     result = await db.execute(
-        select(User).where(User.username == username)
+        select(User).where(
+            (User.username == username) | (User.email == username)
+        )
     )
     user = result.scalar_one_or_none()
     
@@ -105,7 +108,7 @@ async def authenticate_user(db: AsyncSession, username: str, password: str) -> U
     return user
 
 
-@router.post("/register", response_model=UserRead)
+@router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 async def register(
     user_data: UserCreate,
     db: AsyncSession = Depends(get_db)
@@ -123,7 +126,7 @@ async def register(
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User with this email or username already exists"
+            detail="A user with this email or username is already registered"
         )
     
     # Create new user
@@ -160,7 +163,15 @@ async def login(
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
+    # Check if user account is active
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Inactive user account",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     access_token = create_access_token(data={"sub": user.username})
     
     return {

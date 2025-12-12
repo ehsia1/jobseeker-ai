@@ -49,6 +49,7 @@ ollama==0.1.7
 
 # Integrations
 slack-sdk==3.26.2
+stripe==7.0.0
 
 # Email
 aiosmtplib==3.0.1

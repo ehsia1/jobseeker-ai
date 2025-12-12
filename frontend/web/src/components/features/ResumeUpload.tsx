@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -61,13 +61,24 @@ export default function ResumeUpload({ onResumeLoaded }: ResumeUploadProps) {
 
   const loadExistingResume = useCallback(async () => {
     try {
+      console.log('[ResumeUpload] Loading existing resume...');
       const existingResume = await apiClient.getResume();
+      console.log('[ResumeUpload] Got resume:', {
+        id: existingResume?.id,
+        full_name: existingResume?.full_name,
+        parse_quality_score: existingResume?.parse_quality_score,
+        total_experience_years: existingResume?.total_experience_years,
+        work_experiences_count: existingResume?.work_experiences?.length,
+        skills: existingResume?.skills?.slice(0, 5),
+      });
       setResume(existingResume);
       onResumeLoaded?.(existingResume);
     } catch (err: any) {
       // No resume exists yet - that's fine
       if (err?.response?.status !== 404) {
         console.error('Failed to load resume:', err);
+      } else {
+        console.log('[ResumeUpload] No existing resume found (404)');
       }
     }
   }, [onResumeLoaded]);
@@ -187,9 +198,9 @@ export default function ResumeUpload({ onResumeLoaded }: ResumeUploadProps) {
   };
 
   // Load existing resume on mount
-  useState(() => {
+  useEffect(() => {
     loadExistingResume();
-  });
+  }, [loadExistingResume]);
 
   return (
     <Card className="h-full flex flex-col">

@@ -106,7 +106,18 @@ export default function RegisterPage() {
         }
       }
     } catch (err: any) {
-      const errorMessage = err?.response?.data?.detail || 'Failed to create account. Please try again.';
+      const detail = err?.response?.data?.detail;
+      let errorMessage = 'Failed to create account. Please try again.';
+
+      if (typeof detail === 'string') {
+        errorMessage = detail;
+      } else if (Array.isArray(detail) && detail.length > 0) {
+        // Validation error array from FastAPI
+        errorMessage = detail.map((e: any) => e.msg || e.message).join(', ');
+      } else if (detail?.msg) {
+        errorMessage = detail.msg;
+      }
+
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {

@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Input } from '@/components/ui/input';
 import {
   Briefcase,
   Search,
@@ -15,23 +15,18 @@ import {
   TrendingUp,
   Bell,
   ExternalLink,
-  Sparkles,
-  Loader2,
-  CheckCircle
+  ArrowRight,
 } from 'lucide-react';
 import { useCurrentUser, useUserProfile, useJobMatches, useUsageStats } from '@/hooks/useAPI';
 import UsageDisplay from '@/components/features/UsageDisplay';
-import { apiClient } from '@/lib/api/client';
-import { toast } from 'sonner';
 
 export default function DashboardPage() {
   const router = useRouter();
   const { user, loading: userLoading } = useCurrentUser();
   const { profile } = useUserProfile();
-  const { matches, loading: matchesLoading, refresh: refreshMatches } = useJobMatches(undefined, 1, 5);
+  const { matches, loading: matchesLoading } = useJobMatches(undefined, 1, 5);
   const { usage, loading: usageLoading } = useUsageStats();
-  const [runningAgent, setRunningAgent] = useState(false);
-  const [agentResult, setAgentResult] = useState<{ matches_found?: number; top_matches?: Array<{ id: string }>; source_stats?: Record<string, number> } | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const getProfileCompletionScore = () => {
     if (!profile) return 0;
@@ -47,49 +42,17 @@ export default function DashboardPage() {
 
   const profileScore = getProfileCompletionScore();
 
-  const runJobAgent = async () => {
-    if (!profile || profileScore < 50) {
-      toast.error('Please complete your profile first (at least 50%)');
-      router.push('/profile');
-      return;
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+    } else {
+      router.push('/search');
     }
+  };
 
-    setRunningAgent(true);
-    setAgentResult(null);
-
-    try {
-      toast.info('AI Agent starting job search across multiple boards...');
-      
-      const result = await apiClient.runJobRadarAgent(
-        user?.id,
-        profile.skills,
-        profile.profession
-      );
-
-      if (result.success) {
-        setAgentResult(result);
-        toast.success(`Found ${result.matches_found} new job matches!`);
-        
-        // Refresh matches after a short delay
-        setTimeout(() => {
-          refreshMatches();
-        }, 1000);
-
-        // Navigate to matches page if many found
-        if (result.matches_found > 5) {
-          setTimeout(() => {
-            router.push('/matches');
-          }, 2000);
-        }
-      } else {
-        toast.error('Agent failed to find matches. Please try again.');
-      }
-    } catch (err) {
-      console.error('Agent error:', err);
-      toast.error((err as Error)?.message || 'Failed to run job search agent');
-    } finally {
-      setRunningAgent(false);
-    }
+  const goToSearch = () => {
+    router.push('/search');
   };
 
   if (userLoading) {
@@ -106,32 +69,52 @@ export default function DashboardPage() {
     <AppLayout>
       <div className="space-y-6">
         {/* Welcome Header */}
-        <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-              Welcome back, {user?.full_name || 'there'}! 👋
-            </h1>
-            <p className="text-gray-600 dark:text-gray-300 mt-2">
-              Here&apos;s your job search overview and latest opportunities.
-            </p>
-          </div>
-          <Button 
-            onClick={runJobAgent}
-            disabled={runningAgent || profileScore < 50}
-          >
-            {runningAgent ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Searching...
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-4 h-4 mr-2" />
-                Run AI Agent
-              </>
-            )}
-          </Button>
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+            Welcome back, {user?.full_name || 'there'}!
+          </h1>
+          <p className="text-gray-600 dark:text-gray-300 mt-2">
+            Find your next opportunity and generate winning proposals.
+          </p>
         </div>
+
+        {/* Hero Search CTA */}
+        <Card className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white border-0">
+          <CardContent className="pt-8 pb-8">
+            <div className="text-center space-y-4">
+              <Search className="w-12 h-12 mx-auto opacity-90" />
+              <h2 className="text-2xl font-bold">Search for Jobs</h2>
+              <p className="text-blue-100 max-w-md mx-auto">
+                Search across job boards, get AI-powered match scores, and generate tailored proposals.
+              </p>
+
+              {/* Inline search form */}
+              <form onSubmit={handleSearch} className="flex gap-2 max-w-lg mx-auto mt-6">
+                <Input
+                  type="text"
+                  placeholder="e.g. Python Developer, React, Data Scientist..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="bg-white/10 border-white/20 text-white placeholder:text-blue-200 focus:bg-white/20"
+                />
+                <Button type="submit" variant="secondary" size="lg">
+                  <Search className="w-4 h-4 mr-2" />
+                  Search
+                </Button>
+              </form>
+
+              {/* Or browse all button */}
+              <Button
+                variant="ghost"
+                className="text-white hover:bg-white/10 mt-2"
+                onClick={goToSearch}
+              >
+                Browse all jobs
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Key Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -186,27 +169,8 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        {/* Agent Result Alert */}
-        {agentResult && (
-          <Alert className="bg-green-50 border-green-200">
-            <CheckCircle className="h-4 w-4 text-green-600" />
-            <AlertDescription className="text-green-800">
-              <strong>AI Agent Complete!</strong> Found {agentResult.matches_found} job matches across {Object.keys(agentResult.source_stats || {}).length} job boards.
-              {(agentResult.matches_found ?? 0) > 0 && (
-                <Button 
-                  variant="link" 
-                  className="ml-2 p-0 h-auto text-green-700"
-                  onClick={() => router.push('/matches')}
-                >
-                  View Matches →
-                </Button>
-              )}
-            </AlertDescription>
-          </Alert>
-        )}
-
         {/* Profile Completion Alert */}
-        {profileScore < 80 && !runningAgent && (
+        {profileScore < 80 && (
           <Card className="border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950">
             <CardHeader>
               <CardTitle className="text-orange-800 dark:text-orange-200 flex items-center">
@@ -325,17 +289,29 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="grid md:grid-cols-3 gap-4">
-              <Button variant="outline" className="flex flex-col h-20">
+              <Button
+                variant="outline"
+                className="flex flex-col h-20"
+                onClick={goToSearch}
+              >
                 <Search className="w-5 h-5 mb-1" />
                 <span className="text-sm">Search Jobs</span>
               </Button>
-              
-              <Button variant="outline" className="flex flex-col h-20">
+
+              <Button
+                variant="outline"
+                className="flex flex-col h-20"
+                onClick={() => router.push('/matches')}
+              >
                 <Target className="w-5 h-5 mb-1" />
-                <span className="text-sm">Run AI Agent</span>
+                <span className="text-sm">View Matches</span>
               </Button>
-              
-              <Button variant="outline" className="flex flex-col h-20">
+
+              <Button
+                variant="outline"
+                className="flex flex-col h-20"
+                onClick={() => router.push('/profile')}
+              >
                 <Briefcase className="w-5 h-5 mb-1" />
                 <span className="text-sm">Update Profile</span>
               </Button>

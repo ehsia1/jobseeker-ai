@@ -4,16 +4,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { 
-  MapPin, 
-  DollarSign, 
-  Clock, 
-  Building2, 
+import {
+  MapPin,
+  DollarSign,
+  Clock,
+  Building2,
   ExternalLink,
   Bookmark,
   BookmarkCheck,
   TrendingUp,
-  Calendar
+  Calendar,
+  FileText
 } from 'lucide-react';
 import { Job, ScoredJob } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
@@ -23,16 +24,18 @@ interface JobCardProps {
   onView?: (job: Job | ScoredJob) => void;
   onSave?: (job: Job | ScoredJob) => void;
   onApply?: (job: Job | ScoredJob) => void;
+  onGenerateProposal?: (job: Job | ScoredJob) => void;
   isSaved?: boolean;
   showScore?: boolean;
   compact?: boolean;
 }
 
-export default function JobCard({ 
-  job, 
-  onView, 
-  onSave, 
+export default function JobCard({
+  job,
+  onView,
+  onSave,
   onApply,
+  onGenerateProposal,
   isSaved = false,
   showScore = false,
   compact = false
@@ -238,7 +241,7 @@ export default function JobCard({
 
         {/* Actions */}
         <div className="flex gap-2 pt-2">
-          <Button 
+          <Button
             className="flex-1"
             onClick={(e) => {
               e.stopPropagation();
@@ -247,15 +250,25 @@ export default function JobCard({
           >
             Apply Now
           </Button>
-          <Button 
+          <Button
             variant="outline"
+            onClick={(e) => {
+              e.stopPropagation();
+              onGenerateProposal?.(job);
+            }}
+          >
+            <FileText className="w-4 h-4 mr-2" />
+            Proposal
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={(e) => {
               e.stopPropagation();
               onView?.(job);
             }}
           >
-            <ExternalLink className="w-4 h-4 mr-2" />
-            View Details
+            <ExternalLink className="w-4 h-4" />
           </Button>
         </div>
       </CardContent>

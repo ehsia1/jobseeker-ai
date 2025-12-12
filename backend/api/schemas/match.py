@@ -17,6 +17,7 @@ class JobMatchBase(BaseModel):
     explanation: Optional[str] = None
     status: str = Field(default="new", pattern="^(new|viewed|saved|applied|rejected|interviewed|hired)$")
     proposal: Optional[str] = None
+    client_notes: Optional[str] = None
 
 
 class JobMatchCreate(JobMatchBase):

@@ -142,8 +142,8 @@ class Subscription(Base):
     usage_reset_date = Column(Date, nullable=True)  # When monthly counters reset
     daily_reset_date = Column(Date, nullable=True)  # When daily counters reset
 
-    # Metadata
-    metadata = Column(JSONB, nullable=False, default=dict)
+    # Extra data
+    extra_data = Column(JSONB, nullable=False, default=dict)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
@@ -223,7 +223,7 @@ class UsageLog(Base):
     )
 
     # Additional context
-    metadata = Column(JSONB, nullable=False, default=dict)  # e.g., {"job_id": "...", "tone": "medium"}
+    extra_data = Column(JSONB, nullable=False, default=dict)  # e.g., {"job_id": "...", "tone": "medium"}
 
     # Cost tracking (for internal analytics)
     tokens_used = Column(Integer, nullable=True)  # LLM tokens consumed

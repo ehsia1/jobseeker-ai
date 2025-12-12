@@ -1,21 +1,24 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import AppLayout from '@/components/layout/AppLayout';
 import JobCard from '@/components/features/JobCard';
+import JobDetailsModal from '@/components/features/JobDetailsModal';
+import ProposalModal from '@/components/features/ProposalModal';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Slider } from '@/components/ui/slider';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { 
-  Search, 
-  Filter, 
-  Loader2, 
+import {
+  Search,
+  Filter,
+  Loader2,
   AlertCircle,
   Briefcase,
   MapPin,
@@ -25,7 +28,7 @@ import {
   ChevronUp
 } from 'lucide-react';
 import { apiClient } from '@/lib/api/client';
-import { Job, JobSearchForm, SearchResponse } from '@/lib/types';
+import { Job, ScoredJob, JobSearchForm, SearchResponse } from '@/lib/types';
 import { toast } from 'sonner';
 
 // Profession options based on backend support
@@ -47,7 +50,24 @@ const PROFESSIONS = [
   { value: 'consulting', label: 'Consulting' },
 ];
 
+// Wrapper component to handle Suspense for useSearchParams
 export default function SearchPage() {
+  return (
+    <Suspense fallback={
+      <AppLayout>
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </AppLayout>
+    }>
+      <SearchPageContent />
+    </Suspense>
+  );
+}
+
+function SearchPageContent() {
+  const searchParams = useSearchParams();
+
   const [searchForm, setSearchForm] = useState<JobSearchForm>({
     keywords: '',
     profession: '',
@@ -63,6 +83,26 @@ export default function SearchPage() {
   const [savedJobs, setSavedJobs] = useState<Set<string>>(new Set());
   const [showFilters, setShowFilters] = useState(true);
   const [salaryRange, setSalaryRange] = useState<number[]>([0, 200000]);
+
+  // Modal states
+  const [selectedJob, setSelectedJob] = useState<Job | ScoredJob | null>(null);
+  const [showJobDetails, setShowJobDetails] = useState(false);
+  const [showProposalModal, setShowProposalModal] = useState(false);
+
+  // Handle URL query param
+  useEffect(() => {
+    const query = searchParams.get('q');
+    if (query && query !== searchForm.keywords) {
+      setSearchForm(prev => ({ ...prev, keywords: query }));
+    }
+  }, [searchParams]);
+
+  // Auto-search when keywords change from URL
+  useEffect(() => {
+    if (searchForm.keywords && !searchResults && !loading) {
+      handleSearch();
+    }
+  }, [searchForm.keywords]);
 
   const handleSearch = useCallback(async () => {
     setLoading(true);
@@ -93,7 +133,7 @@ export default function SearchPage() {
     }
   }, [searchForm, salaryRange]);
 
-  const handleSaveJob = (job: Job) => {
+  const handleSaveJob = (job: Job | ScoredJob) => {
     const newSavedJobs = new Set(savedJobs);
     if (newSavedJobs.has(job.id)) {
       newSavedJobs.delete(job.id);
@@ -105,14 +145,27 @@ export default function SearchPage() {
     setSavedJobs(newSavedJobs);
   };
 
-  const handleApplyJob = async (job: Job) => {
-    // In a real app, this would create an application
+  const handleApplyJob = async (job: Job | ScoredJob) => {
     window.open(job.url, '_blank');
     toast.success('Opening job application page...');
   };
 
-  const handleViewJob = (job: Job) => {
-    window.open(job.url, '_blank');
+  const handleViewJob = (job: Job | ScoredJob) => {
+    setSelectedJob(job);
+    setShowJobDetails(true);
+  };
+
+  const handleGenerateProposal = (job: Job | ScoredJob) => {
+    setSelectedJob(job);
+    setShowProposalModal(true);
+  };
+
+  const handleCloseJobDetails = () => {
+    setShowJobDetails(false);
+  };
+
+  const handleCloseProposalModal = () => {
+    setShowProposalModal(false);
   };
 
   const clearFilters = () => {
@@ -368,8 +421,9 @@ export default function SearchPage() {
                   onView={handleViewJob}
                   onSave={handleSaveJob}
                   onApply={handleApplyJob}
+                  onGenerateProposal={handleGenerateProposal}
                   isSaved={savedJobs.has(job.id)}
-                  showScore={false}
+                  showScore={true}
                 />
               ))}
             </div>
@@ -398,6 +452,29 @@ export default function SearchPage() {
           )}
         </div>
       </div>
+
+      {/* Job Details Modal */}
+      {selectedJob && (
+        <JobDetailsModal
+          job={selectedJob}
+          open={showJobDetails}
+          onClose={handleCloseJobDetails}
+          onGenerateProposal={() => {
+            setShowJobDetails(false);
+            setShowProposalModal(true);
+          }}
+          onApply={() => handleApplyJob(selectedJob)}
+        />
+      )}
+
+      {/* Proposal Modal */}
+      {selectedJob && (
+        <ProposalModal
+          job={selectedJob}
+          open={showProposalModal}
+          onClose={handleCloseProposalModal}
+        />
+      )}
     </AppLayout>
   );
 }

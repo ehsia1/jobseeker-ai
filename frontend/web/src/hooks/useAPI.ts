@@ -26,8 +26,11 @@ export function useCurrentUser() {
     }
   );
 
+  // Backend returns user directly (or wrapped in data for some endpoints)
+  const user = data?.data || data;
+
   return {
-    user: data?.data,
+    user,
     loading: !data && !error,
     error: error?.response?.data?.error || error?.message,
     refresh: mutate,
@@ -43,8 +46,11 @@ export function useUserProfile(userId?: string) {
     }
   );
 
+  // Backend returns profile directly
+  const profile = data?.data || data;
+
   return {
-    profile: data?.data,
+    profile,
     loading: !data && !error,
     error: error?.response?.data?.error || error?.message,
     refresh: mutate,
@@ -84,8 +90,11 @@ export function useJob(jobId: string | null) {
     }
   );
 
+  // Backend returns job directly
+  const job = data?.data || data;
+
   return {
-    job: data?.data,
+    job,
     loading: !data && !error && !!jobId,
     error: error?.response?.data?.error || error?.message,
     refresh: mutate,

@@ -3,7 +3,7 @@
 import os
 from typing import List, Optional
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -20,15 +20,15 @@ class Settings(BaseSettings):
     secret_key: str = Field(env="SECRET_KEY")
     jwt_algorithm: str = Field(default="HS256", env="JWT_ALGORITHM")
     jwt_expiration_hours: int = Field(default=24, env="JWT_EXPIRATION_HOURS")
-    allowed_origins_str: str = Field(
+    allowed_origins: str = Field(
         default="http://localhost:3000,http://localhost:8080",
-        env="ALLOWED_ORIGINS"
+        validation_alias="ALLOWED_ORIGINS"
     )
-    
+
     @property
-    def allowed_origins(self) -> List[str]:
+    def allowed_origins_list(self) -> List[str]:
         """Get allowed origins as a list."""
-        return [origin.strip() for origin in self.allowed_origins_str.split(",") if origin.strip()]
+        return [origin.strip() for origin in self.allowed_origins.split(",") if origin.strip()]
     
     # Database
     database_url: str = Field(env="DATABASE_URL")
@@ -107,11 +107,12 @@ class Settings(BaseSettings):
         """Check if Stripe is properly configured."""
         return bool(self.stripe_secret_key and self.stripe_publishable_key)
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
-        extra = "ignore"  # Ignore extra fields from .env
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",  # Ignore extra fields from .env
+    )
 
 
 # Global settings instance

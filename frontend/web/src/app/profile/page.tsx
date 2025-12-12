@@ -119,22 +119,27 @@ export default function ProfilePage() {
     setSaving(true);
 
     try {
-      const response = profile 
-        ? await apiClient.updateUserProfile(formData)
-        : await apiClient.createUserProfile(formData);
+      // Both update and create use PUT on backend
+      await apiClient.updateUserProfile(formData);
 
-      if (response.success) {
-        setSuccess(true);
-        toast.success('Profile saved successfully!');
-        refresh();
-        
-        // If this was first profile creation, redirect to dashboard
-        if (!profile) {
-          setTimeout(() => router.push('/dashboard'), 1500);
-        }
+      setSuccess(true);
+      toast.success('Profile saved successfully!');
+      refresh();
+
+      // If this was first profile creation, redirect to dashboard
+      if (!profile) {
+        setTimeout(() => router.push('/dashboard'), 1500);
       }
     } catch (err: any) {
-      const errorMessage = err?.response?.data?.detail || 'Failed to save profile';
+      const detail = err?.response?.data?.detail;
+      let errorMessage = 'Failed to save profile';
+
+      if (typeof detail === 'string') {
+        errorMessage = detail;
+      } else if (Array.isArray(detail) && detail.length > 0) {
+        errorMessage = detail.map((e: any) => e.msg || e.message).join(', ');
+      }
+
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {

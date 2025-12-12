@@ -320,7 +320,7 @@ For metrics and achievements, preserve exact numbers and percentages."""
 RESUME TEXT:
 {text[:8000]}  # Limit to avoid token limits
 
-Extract the following information in JSON format:
+Extract the following information in JSON format. Return ONLY valid JSON, no comments:
 
 {{
     "full_name": "string or null",
@@ -348,19 +348,21 @@ Extract the following information in JSON format:
             "company": "company name",
             "title": "job title",
             "location": "location or null",
-            "employment_type": "full-time|contract|freelance|part-time|null",
-            "is_remote": true/false,
+            "employment_type": "full-time or contract or freelance or part-time or null",
+            "is_remote": true or false,
             "start_date": "YYYY-MM-DD or YYYY or null",
-            "end_date": "YYYY-MM-DD or YYYY or null (null if current)",
-            "is_current": true/false,
+            "end_date": "YYYY-MM-DD or YYYY or null if current",
+            "is_current": true or false,
             "description": "role description",
             "achievements": ["list of bullet points/achievements"],
             "skills_used": ["technologies/skills used in this role"],
-            "metrics": {{"key": "value"}} // quantified achievements
+            "metrics": {{"key": "value"}}
         }}
     ],
-    "parse_quality_score": 0-100  // your confidence in the parse quality
-}}"""
+    "parse_quality_score": 85
+}}
+
+Note: parse_quality_score should be a number from 0 to 100 indicating your confidence in the parse quality."""
 
         try:
             result = await self.llm.generate_structured(prompt, system_prompt)

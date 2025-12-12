@@ -22,18 +22,19 @@ class NotificationCreate(NotificationBase):
 class NotificationRead(NotificationBase):
     """Notification read schema."""
     model_config = ConfigDict(from_attributes=True)
-    
+
     id: UUID
     user_id: UUID
     status: str
-    metadata: Dict
-    sent_at: Optional[datetime]
-    error_message: Optional[str]
+    read: bool = False
+    notification_metadata: Dict = Field(default_factory=dict, alias="metadata")
+    sent_at: Optional[datetime] = None
+    error_message: Optional[str] = None
     created_at: datetime
-    
+
     # Computed properties
-    is_delivered: bool
-    is_failed: bool
-    can_retry: bool
-    recipient_info: Dict
-    template_data: Dict
+    is_delivered: bool = False
+    is_failed: bool = False
+    can_retry: bool = False
+    recipient_info: Dict = Field(default_factory=dict)
+    template_data: Dict = Field(default_factory=dict)

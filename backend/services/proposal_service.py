@@ -319,19 +319,17 @@ Return ONLY the enhanced proposal text. No explanations or headers."""
                 "description": parsed_jd.raw_text[:1000],  # Truncate for prompt
             }
         elif job:
+            # requirements is a JSONB list, not a dict
+            requirements_list = job.requirements or []
             return {
                 "title": job.title,
                 "company": job.company or "the company",
                 "required_skills": job.skills or [],
                 "nice_to_have_skills": [],
-                "key_requirements": job.requirements.get("key_requirements", [])
-                if job.requirements
-                else [],
+                "key_requirements": requirements_list if isinstance(requirements_list, list) else [],
                 "keywords": [],  # Would need to extract
                 "responsibilities": [],
-                "experience_level": job.requirements.get("experience_level")
-                if job.requirements
-                else None,
+                "experience_level": None,  # Not stored in current schema
                 "remote": job.remote,
                 "description": job.description[:1000] if job.description else "",
             }

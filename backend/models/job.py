@@ -8,7 +8,8 @@ from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text, DECIMAL
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from pgvector.sqlalchemy import Vector
+# pgvector import - commented out for local dev without pgvector extension
+# from pgvector.sqlalchemy import Vector
 
 from backend.database import Base
 
@@ -56,8 +57,8 @@ class Job(Base):
     # Raw data from source
     raw_data = Column(JSONB, nullable=False, default=dict)
     
-    # AI embedding for job matching
-    job_embedding = Column(Vector(1536))  # OpenAI ada-002 dimension
+    # AI embedding for job matching - commented out for local dev without pgvector
+    # job_embedding = Column(Vector(1536))  # OpenAI ada-002 dimension
     
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
@@ -131,6 +132,7 @@ class JobMatch(Base):
     
     # Proposal and application tracking
     proposal = Column(Text)  # Generated or custom proposal
+    client_notes = Column(Text)  # User's personal notes about the match
     applied_at = Column(DateTime(timezone=True))
     
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Dict, Optional
 from uuid import UUID, uuid4
 
-from sqlalchemy import Column, DateTime, String, Text, ForeignKey
+from sqlalchemy import Boolean, Column, DateTime, String, Text, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -30,6 +30,9 @@ class Notification(Base):
     
     subject = Column(Text)  # Email subject or notification title
     content = Column(Text)  # HTML/markdown content or message
+
+    # User read status (for in-app notifications)
+    read = Column(Boolean, default=False, nullable=False)
     
     # Delivery metadata
     notification_metadata = Column(JSONB, nullable=False, default=dict)

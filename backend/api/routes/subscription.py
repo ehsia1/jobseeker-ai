@@ -41,24 +41,32 @@ def _tier_to_enum(tier: SubscriptionTier) -> SubscriptionTierEnum:
 
 def _get_tier_features(tier: SubscriptionTier) -> TierFeatures:
     """Get features for a tier."""
-    limits = TIER_LIMITS[tier]
+    limits = TIER_LIMITS[tier.value]
+    features = limits["features"]
     return TierFeatures(
-        proposal_tones=limits["proposal_tones"],
-        proposal_enhance=limits["proposal_enhance"],
-        auto_apply=limits["auto_apply"],
-        priority_support=limits["priority_support"],
-        analytics=limits["analytics"],
+        proposal_tones=features["proposal_tones"],
+        proposal_enhance=features["proposal_enhance"],
+        auto_apply=features["auto_apply"],
+        priority_support=features["priority_support"],
+        analytics=features["analytics"],
     )
+
+
+def _convert_tier_limit(value) -> int:
+    """Convert tier limit value to int, using -1 for unlimited (infinity)."""
+    if value == float("inf"):
+        return -1
+    return int(value)
 
 
 def _get_tier_limits(tier: SubscriptionTier) -> TierLimits:
     """Get limits for a tier."""
-    limits = TIER_LIMITS[tier]
+    limits = TIER_LIMITS[tier.value]
     return TierLimits(
-        proposals_per_month=limits["proposals_per_month"],
-        jd_parses_per_month=limits["jd_parses_per_month"],
-        job_searches_per_day=limits["job_searches_per_day"],
-        resume_uploads=limits["resume_uploads"],
+        proposals_per_month=_convert_tier_limit(limits["proposals_per_month"]),
+        jd_parses_per_month=_convert_tier_limit(limits["jd_parses_per_month"]),
+        job_searches_per_day=_convert_tier_limit(limits["job_searches_per_day"]),
+        resume_uploads=_convert_tier_limit(limits["resume_uploads"]),
         features=_get_tier_features(tier),
     )
 
@@ -147,16 +155,16 @@ async def get_usage_stats(
     service = SubscriptionService(db)
     subscription = await service.get_or_create_subscription(current_user.id)
 
-    limits = TIER_LIMITS[subscription.tier]
+    limits = TIER_LIMITS[subscription.tier.value]
 
-    # Calculate remaining
-    proposals_limit = limits["proposals_per_month"]
+    # Calculate remaining (use -1 for unlimited)
+    proposals_limit = _convert_tier_limit(limits["proposals_per_month"])
     proposals_remaining = -1 if proposals_limit == -1 else max(0, proposals_limit - subscription.proposal_count)
 
-    jd_limit = limits["jd_parses_per_month"]
+    jd_limit = _convert_tier_limit(limits["jd_parses_per_month"])
     jd_remaining = -1 if jd_limit == -1 else max(0, jd_limit - subscription.jd_parse_count)
 
-    search_limit = limits["job_searches_per_day"]
+    search_limit = _convert_tier_limit(limits["job_searches_per_day"])
     search_remaining = -1 if search_limit == -1 else max(0, search_limit - subscription.job_search_count_today)
 
     return UsageStats(

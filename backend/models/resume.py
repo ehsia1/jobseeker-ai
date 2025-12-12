@@ -8,7 +8,8 @@ from sqlalchemy import Boolean, Column, Date, DateTime, Enum as SQLEnum, Integer
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from pgvector.sqlalchemy import Vector
+# pgvector import - commented out for local dev without pgvector extension
+# from pgvector.sqlalchemy import Vector
 
 from backend.database import Base
 
@@ -60,8 +61,8 @@ class Resume(Base):
     parsing_version = Column(String(50), default="v1")
     parse_quality_score = Column(Integer, nullable=True)  # 0-100, how confident we are in the parse
 
-    # AI embedding for resume matching
-    resume_embedding = Column(Vector(1536))  # OpenAI ada-002 dimension
+    # AI embedding for resume matching - commented out for local dev
+    # resume_embedding = Column(Vector(1536))  # OpenAI ada-002 dimension
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

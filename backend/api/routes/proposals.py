@@ -129,6 +129,8 @@ async def generate_proposal(
             experience_highlighted=proposal.experience_highlighted,
         )
 
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions as-is
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
@@ -227,6 +229,8 @@ async def generate_all_tones(
             ),
         )
 
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions as-is
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
@@ -301,6 +305,8 @@ async def enhance_proposal(
             enhancements_applied=enhancements,
         )
 
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions as-is
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:

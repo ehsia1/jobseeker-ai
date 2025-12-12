@@ -1,16 +1,23 @@
 """Job management routes."""
 
+import logging
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_, desc
+from sqlalchemy import select, and_, or_, desc, func
 from sqlalchemy.orm import selectinload
 
 from backend.database import get_db
-from backend.models.user import User
+from backend.models.user import User, UserProfile
 from backend.models.job import Job
-from backend.api.schemas.job import JobRead, JobSummary, JobSearch
+from backend.api.schemas.job import (
+    JobRead, JobSummary, JobSearch,
+    ScoredJobSummary, ScoredSearchResponse, ScoreBreakdownSchema
+)
 from backend.api.routes.auth import get_current_user
+from backend.services.scoring_service import ScoringService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -57,16 +64,25 @@ async def list_jobs(
     return jobs
 
 
-@router.get("/{job_id}", response_model=JobRead)
+@router.get("/{job_id}/", response_model=JobRead)
 async def get_job(
     job_id: str,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """Get job details by ID."""
-    
+    from uuid import UUID
+
+    try:
+        job_uuid = UUID(job_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Job not found"
+        )
+
     result = await db.execute(
-        select(Job).where(Job.id == job_id)
+        select(Job).where(Job.id == job_uuid)
     )
     job = result.scalar_one_or_none()
     
@@ -79,21 +95,25 @@ async def get_job(
     return job
 
 
-@router.post("/search", response_model=List[JobSummary])
+@router.post("/search/", response_model=ScoredSearchResponse)
 async def search_jobs(
     search_params: JobSearch,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Search jobs with advanced parameters."""
-    
+    """Search jobs with advanced parameters and return scored results."""
+
     query = select(Job).order_by(desc(Job.posted_at))
-    
+
     filters = []
-    
+
     # Text search in title and description
-    if search_params.query:
-        search_term = f"%{search_params.query.lower()}%"
+    search_text = search_params.query
+    if not search_text and search_params.keywords:
+        search_text = " ".join(search_params.keywords)
+
+    if search_text:
+        search_term = f"%{search_text.lower()}%"
         filters.append(
             or_(
                 Job.title.ilike(search_term),
@@ -101,22 +121,22 @@ async def search_jobs(
                 Job.company.ilike(search_term)
             )
         )
-    
+
     # Skills filtering
     if search_params.skills:
         # Use JSONB contains for skills array
         for skill in search_params.skills:
             filters.append(Job.skills.contains([skill]))
-    
+
     # Location filtering
     if search_params.location:
         location_term = f"%{search_params.location.lower()}%"
         filters.append(Job.location.ilike(location_term))
-    
+
     # Remote only
     if search_params.remote_only:
         filters.append(Job.remote == True)
-    
+
     # Rate filtering
     if search_params.min_rate:
         filters.append(
@@ -125,7 +145,7 @@ async def search_jobs(
                 Job.rate_max >= search_params.min_rate
             )
         )
-    
+
     if search_params.max_rate:
         filters.append(
             or_(
@@ -133,31 +153,110 @@ async def search_jobs(
                 Job.rate_max <= search_params.max_rate
             )
         )
-    
+
     # Rate type filtering
     if search_params.rate_type:
         filters.append(Job.rate_type == search_params.rate_type)
-    
+
     # Source filtering
     if search_params.sources:
         filters.append(Job.source.in_(search_params.sources))
-    
+
     # Posted date filtering
     if search_params.posted_after:
         filters.append(Job.posted_at >= search_params.posted_after)
-    
+
     if filters:
         query = query.where(and_(*filters))
-    
+
     query = query.limit(search_params.limit).offset(search_params.offset)
-    
+
     result = await db.execute(query)
     jobs = result.scalars().all()
-    
-    return jobs
+
+    # Get user's profile for scoring
+    profile_result = await db.execute(
+        select(UserProfile).where(UserProfile.user_id == current_user.id)
+    )
+    profile = profile_result.scalar_one_or_none()
+
+    # Score each job
+    scoring_service = ScoringService()
+    scored_jobs = []
+    source_stats = {}
+
+    for job in jobs:
+        # Track source stats
+        source_name = job.source or "unknown"
+        source_stats[source_name] = source_stats.get(source_name, 0) + 1
+
+        # Score the job against user profile
+        if profile:
+            try:
+                score_result = scoring_service.score_job(job, profile)
+                explanation = scoring_service.generate_explanation(job, profile, score_result)
+
+                score_breakdown = ScoreBreakdownSchema(
+                    skill_match=score_result.skill_match,
+                    experience_match=score_result.experience_match,
+                    compensation_match=score_result.compensation_match,
+                    location_match=score_result.location_match,
+                    semantic_similarity=score_result.semantic_similarity,
+                    freshness_score=score_result.freshness_score,
+                    preference_match=score_result.preference_match,
+                )
+                total_score = score_result.total_score
+            except Exception as e:
+                logger.warning(f"Error scoring job {job.id}: {e}")
+                score_breakdown = ScoreBreakdownSchema(
+                    skill_match=50, experience_match=50,
+                    compensation_match=50, location_match=50
+                )
+                total_score = 50
+                explanation = "Unable to calculate match score"
+        else:
+            # No profile, use neutral scores
+            score_breakdown = ScoreBreakdownSchema(
+                skill_match=50, experience_match=50,
+                compensation_match=50, location_match=50
+            )
+            total_score = 50
+            explanation = "Complete your profile for personalized matching"
+
+        scored_job = ScoredJobSummary(
+            id=job.id,
+            title=job.title,
+            company=job.company,
+            description=job.description[:500] if job.description else None,
+            location=job.location,
+            remote=job.remote,
+            rate_min=job.rate_min,
+            rate_max=job.rate_max,
+            rate_type=job.rate_type,
+            employment_type=job.duration,  # Map duration to employment_type
+            skills=job.skills or [],
+            posted_at=job.posted_at,
+            url=job.url,
+            source=job.source,
+            total_score=total_score,
+            score_breakdown=score_breakdown,
+            explanation=explanation,
+            recommended=total_score >= 70,
+        )
+        scored_jobs.append(scored_job)
+
+    # Sort by score (highest first)
+    scored_jobs.sort(key=lambda x: x.total_score, reverse=True)
+
+    return ScoredSearchResponse(
+        success=True,
+        total_results=len(scored_jobs),
+        source_stats=source_stats,
+        jobs=scored_jobs,
+    )
 
 
-@router.get("/sources/list")
+@router.get("/sources/list/")
 async def list_job_sources(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -172,7 +271,7 @@ async def list_job_sources(
     return {"sources": sources}
 
 
-@router.get("/professions/list")
+@router.get("/professions/list/")
 async def list_professions(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -197,7 +296,7 @@ async def list_professions(
     }
 
 
-@router.post("/search/live")
+@router.post("/search/live/")
 async def search_live_jobs(
     search_params: dict,
     db: AsyncSession = Depends(get_db),
@@ -223,7 +322,7 @@ async def search_live_jobs(
     return results
 
 
-@router.post("/search/profile")
+@router.post("/search/profile/")
 async def search_jobs_for_profile(
     search_params: dict,
     db: AsyncSession = Depends(get_db),

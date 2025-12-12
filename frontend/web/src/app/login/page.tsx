@@ -45,8 +45,18 @@ export default function LoginPage() {
         // Redirect to dashboard
         router.push('/dashboard');
       }
-    } catch (err) {
-      const errorMessage = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Invalid email or password';
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      let errorMessage = 'Invalid email or password';
+
+      if (typeof detail === 'string') {
+        errorMessage = detail;
+      } else if (Array.isArray(detail) && detail.length > 0) {
+        errorMessage = detail.map((e: any) => e.msg || e.message).join(', ');
+      } else if (detail?.msg) {
+        errorMessage = detail.msg;
+      }
+
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {

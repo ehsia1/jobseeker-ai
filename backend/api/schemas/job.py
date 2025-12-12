@@ -72,7 +72,7 @@ class JobRead(JobBase):
 class JobSummary(BaseModel):
     """Job summary schema for lists."""
     model_config = ConfigDict(from_attributes=True)
-    
+
     id: UUID
     title: str
     company: Optional[str]
@@ -82,11 +82,14 @@ class JobSummary(BaseModel):
     skills: List[str]
     posted_at: Optional[datetime]
     is_active: bool
+    source: Optional[str] = None
 
 
 class JobSearch(BaseModel):
     """Job search parameters."""
     query: Optional[str] = None
+    keywords: Optional[List[str]] = None  # Alternative to query for frontend
+    profession: Optional[str] = None
     skills: Optional[List[str]] = None
     location: Optional[str] = None
     remote_only: Optional[bool] = None
@@ -97,3 +100,50 @@ class JobSearch(BaseModel):
     posted_after: Optional[datetime] = None
     limit: int = Field(default=20, ge=1, le=100)
     offset: int = Field(default=0, ge=0)
+
+
+class ScoreBreakdownSchema(BaseModel):
+    """Score breakdown for a job match."""
+    skill_match: float = Field(..., ge=0, le=100)
+    experience_match: float = Field(..., ge=0, le=100)
+    compensation_match: float = Field(..., ge=0, le=100)
+    location_match: float = Field(..., ge=0, le=100)
+    semantic_similarity: float = Field(default=0, ge=0, le=100)
+    freshness_score: float = Field(default=0, ge=0, le=100)
+    preference_match: float = Field(default=0, ge=0, le=100)
+
+
+class ScoredJobSummary(BaseModel):
+    """Job summary with scoring data."""
+    model_config = ConfigDict(from_attributes=True)
+
+    # Job fields
+    id: UUID
+    title: str
+    company: Optional[str]
+    description: Optional[str] = None
+    location: Optional[str]
+    remote: bool
+    rate_min: Optional[Decimal] = None
+    rate_max: Optional[Decimal] = None
+    rate_type: Optional[str] = None
+    employment_type: Optional[str] = None
+    skills: List[str]
+    posted_at: Optional[datetime]
+    url: Optional[str] = None
+    source: Optional[str] = None
+
+    # Score fields
+    total_score: float = Field(..., ge=0, le=100)
+    score_breakdown: ScoreBreakdownSchema
+    explanation: str = ""
+    recommended: bool = False
+
+
+class ScoredSearchResponse(BaseModel):
+    """Response for scored job search."""
+    success: bool = True
+    total_results: int
+    source_stats: Dict[str, int] = Field(default_factory=dict)
+    jobs: List[ScoredJobSummary]
+    error: Optional[str] = None

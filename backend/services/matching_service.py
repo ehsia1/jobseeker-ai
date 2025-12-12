@@ -82,11 +82,15 @@ class MatchingService:
         # Get user feedback history for context
         context = await self._get_user_context(user_id)
         
-        # Generate profile embedding if not exists
-        if not profile.profile_embedding:
-            profile_embedding = self.embedding_service.generate_profile_embedding(profile)
-            profile.profile_embedding = profile_embedding.tolist()
-            await self.db.commit()
+        # Generate profile embedding if not exists (and if the column is available)
+        # Note: profile_embedding column requires pgvector extension
+        if hasattr(profile, 'profile_embedding') and profile.profile_embedding is None:
+            try:
+                profile_embedding = self.embedding_service.generate_profile_embedding(profile)
+                profile.profile_embedding = profile_embedding.tolist()
+                await self.db.commit()
+            except Exception as e:
+                logger.warning(f"Could not generate profile embedding: {e}")
         
         # Score and match jobs
         matches = []
@@ -363,7 +367,7 @@ class MatchingService:
     
     def _profile_to_dict(self, profile: UserProfile) -> Dict[str, Any]:
         """Convert UserProfile model to dictionary for scoring."""
-        
+
         return {
             "id": str(profile.id),
             "skills": profile.skills or [],
@@ -374,5 +378,5 @@ class MatchingService:
             "max_hours_per_week": profile.max_hours_per_week,
             "availability": profile.availability or {},
             "portfolio": profile.portfolio or {},
-            "profile_embedding": profile.profile_embedding
+            "profile_embedding": getattr(profile, 'profile_embedding', None)
         }
