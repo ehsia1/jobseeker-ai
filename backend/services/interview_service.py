@@ -200,6 +200,38 @@ When evaluating responses:
         await self.db.refresh(session)
         return session
 
+    async def generate_all_session_questions(
+        self,
+        session: InterviewSession,
+        job_context: Optional[Dict[str, Any]] = None,
+    ) -> int:
+        """Generate all remaining questions for a session upfront.
+
+        Args:
+            session: The interview session.
+            job_context: Optional job context for tailoring.
+
+        Returns:
+            Number of questions generated.
+        """
+        # Get current question count
+        result = await self.db.execute(
+            select(InterviewQuestion)
+            .where(InterviewQuestion.session_id == session.id)
+        )
+        existing_questions = len(result.scalars().all())
+
+        questions_generated = 0
+        for i in range(existing_questions + 1, session.total_questions + 1):
+            await self._generate_question(
+                session=session,
+                question_order=i,
+                job_context=job_context,
+            )
+            questions_generated += 1
+
+        return questions_generated
+
     async def get_session(self, session_id: UUID) -> Optional[InterviewSession]:
         """Get an interview session by ID.
 

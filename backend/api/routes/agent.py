@@ -19,6 +19,10 @@ from backend.api.schemas.agent import (
     AgentHealthResponse,
     AgentStatus,
     JobMatchResult,
+    InterviewPrepRequest,
+    InterviewPrepResponse,
+    InterviewPrepStatusResponse,
+    InterviewPlan,
 )
 
 logger = logging.getLogger(__name__)
@@ -27,70 +31,73 @@ router = APIRouter()
 
 # In-memory store for agent run status (in production, use Redis or database)
 _agent_runs: Dict[str, AgentRunResponse] = {}
+_interview_prep_runs: Dict[str, InterviewPrepResponse] = {}
 
 
 async def run_job_radar_agent(
     run_id: str,
     user_id: str,
-    request: AgentRunRequest,
-    db: AsyncSession
+    request: AgentRunRequest
 ):
     """Background task to run the Job Radar agent."""
     from backend.agents.job_radar_agent import JobRadarAgent
+    from backend.database import async_session
 
     try:
         # Update status to running
         _agent_runs[run_id].status = AgentStatus.RUNNING
         _agent_runs[run_id].messages.append("Starting Job Radar agent...")
 
-        # Initialize agent
-        agent = JobRadarAgent(db)
-        _agent_runs[run_id].messages.append("Agent initialized")
+        # Create a new database session for this background task
+        async with async_session() as db:
+            # Initialize agent
+            agent = JobRadarAgent(db)
+            _agent_runs[run_id].messages.append("Agent initialized")
 
-        # Run the agent
-        result = await agent.run(
-            user_id=user_id,
-            keywords=request.keywords,
-            profession=request.profession,
-            remote_only=request.remote_only,
-            min_score=request.min_score,
-            generate_proposals=request.generate_proposals,
-            max_proposals=request.max_proposals
-        )
+            # Run the agent
+            result = await agent.run(
+                user_id=user_id,
+                keywords=request.keywords,
+                profession=request.profession,
+                remote_only=request.remote_only,
+                min_score=request.min_score,
+                generate_proposals=request.generate_proposals,
+                max_proposals=request.max_proposals
+            )
 
-        # Process results
-        if result.get("success"):
-            _agent_runs[run_id].jobs_found = result.get("jobs_found", 0)
-            _agent_runs[run_id].jobs_scored = result.get("jobs_scored", 0)
-            _agent_runs[run_id].matches_found = result.get("matches_found", 0)
-            _agent_runs[run_id].proposals_generated = result.get("proposals_generated", 0)
+            # Process results
+            if result.get("success"):
+                _agent_runs[run_id].jobs_found = result.get("jobs_found", 0)
+                _agent_runs[run_id].jobs_scored = result.get("jobs_scored", 0)
+                _agent_runs[run_id].matches_found = result.get("matches_found", 0)
+                _agent_runs[run_id].proposals_generated = result.get("proposals_generated", 0)
 
-            # Convert matches to response format
-            for match in result.get("top_matches", []):
-                _agent_runs[run_id].top_matches.append(
-                    JobMatchResult(
-                        job_id=str(match.get("job_id", "")),
-                        title=match.get("title", ""),
-                        company=match.get("company", ""),
-                        location=match.get("location"),
-                        remote=match.get("remote", False),
-                        score=match.get("score", 0),
-                        explanation=match.get("explanation"),
-                        proposal=match.get("proposal")
+                # Convert matches to response format
+                for match in result.get("top_matches", []):
+                    _agent_runs[run_id].top_matches.append(
+                        JobMatchResult(
+                            job_id=str(match.get("job_id", "")),
+                            title=match.get("title", ""),
+                            company=match.get("company", ""),
+                            location=match.get("location"),
+                            remote=match.get("remote", False),
+                            score=match.get("score", 0),
+                            explanation=match.get("explanation"),
+                            proposal=match.get("proposal")
+                        )
                     )
-                )
 
-            _agent_runs[run_id].status = AgentStatus.COMPLETED
-            _agent_runs[run_id].messages.append(f"Completed! Found {_agent_runs[run_id].matches_found} matches")
-        else:
-            _agent_runs[run_id].status = AgentStatus.FAILED
-            error_msg = result.get("error", "Unknown error")
-            errors_list = result.get("errors", [])
-            if errors_list:
-                _agent_runs[run_id].errors.extend(errors_list)
+                _agent_runs[run_id].status = AgentStatus.COMPLETED
+                _agent_runs[run_id].messages.append(f"Completed! Found {_agent_runs[run_id].matches_found} matches")
             else:
-                _agent_runs[run_id].errors.append(error_msg)
-            logger.error(f"Agent run {run_id} returned failure: {error_msg}, errors: {errors_list}")
+                _agent_runs[run_id].status = AgentStatus.FAILED
+                error_msg = result.get("error", "Unknown error")
+                errors_list = result.get("errors", [])
+                if errors_list:
+                    _agent_runs[run_id].errors.extend(errors_list)
+                else:
+                    _agent_runs[run_id].errors.append(error_msg)
+                logger.error(f"Agent run {run_id} returned failure: {error_msg}, errors: {errors_list}")
 
     except Exception as e:
         import traceback
@@ -140,8 +147,7 @@ async def start_job_radar(
         run_job_radar_agent,
         run_id=run_id,
         user_id=str(current_user.id),
-        request=request,
-        db=db
+        request=request
     )
 
     logger.info(f"Started Job Radar run {run_id} for user {current_user.id}")
@@ -253,6 +259,207 @@ async def agent_health():
             "job_radar",
             "profile_analysis",
             "job_scoring",
-            "proposal_generation"
+            "proposal_generation",
+            "interview_prep"
         ]
     )
+
+
+# ============================================================================
+# Interview Prep Agent Routes
+# ============================================================================
+
+async def run_interview_prep_agent(
+    run_id: str,
+    user_id: str,
+    request: InterviewPrepRequest
+):
+    """Background task to run the Interview Prep agent."""
+    from backend.agents.interview_prep_agent import InterviewPrepAgent
+    from backend.database import async_session
+
+    try:
+        # Update status to running
+        _interview_prep_runs[run_id].status = AgentStatus.RUNNING
+        _interview_prep_runs[run_id].messages.append("Starting Interview Prep agent...")
+
+        # Create a new database session for this background task
+        async with async_session() as db:
+            # Initialize agent
+            agent = InterviewPrepAgent(db)
+            _interview_prep_runs[run_id].messages.append("Agent initialized")
+
+            # Run the agent
+            result = await agent.run(
+                user_id=user_id,
+                job_id=request.job_id,
+                interview_type=request.interview_type,
+                difficulty=request.difficulty,
+                num_questions=request.num_questions
+            )
+
+            # Process results
+            if result.get("success"):
+                _interview_prep_runs[run_id].session_id = result.get("session_id")
+                _interview_prep_runs[run_id].questions_generated = result.get("questions_generated", 0)
+                _interview_prep_runs[run_id].prep_tips = result.get("prep_tips", [])
+                _interview_prep_runs[run_id].focus_areas = result.get("focus_areas", [])
+                _interview_prep_runs[run_id].skill_gaps = result.get("skill_gaps", [])
+
+                # Convert interview plan to response format
+                if result.get("interview_plan"):
+                    plan_data = result["interview_plan"]
+                    _interview_prep_runs[run_id].interview_plan = InterviewPlan(
+                        interview_type=plan_data.get("interview_type", "behavioral"),
+                        difficulty=plan_data.get("difficulty", "mid"),
+                        focus_areas=plan_data.get("focus_areas", []),
+                        skill_gaps_to_address=plan_data.get("skill_gaps_to_address", []),
+                        target_role=plan_data.get("target_role"),
+                        target_company=plan_data.get("target_company"),
+                        recommended_frameworks=plan_data.get("recommended_frameworks", []),
+                        question_types=plan_data.get("question_types", [])
+                    )
+
+                _interview_prep_runs[run_id].status = AgentStatus.COMPLETED
+                _interview_prep_runs[run_id].messages.append(
+                    f"Completed! Session created with {result.get('questions_generated', 0)} questions"
+                )
+            else:
+                _interview_prep_runs[run_id].status = AgentStatus.FAILED
+                error_msg = result.get("error", "Unknown error")
+                errors_list = result.get("errors", [])
+                if errors_list:
+                    _interview_prep_runs[run_id].errors.extend(errors_list)
+                else:
+                    _interview_prep_runs[run_id].errors.append(error_msg)
+                logger.error(f"Interview Prep run {run_id} failed: {error_msg}")
+
+    except Exception as e:
+        import traceback
+        error_msg = f"{type(e).__name__}: {e}"
+        logger.error(f"Interview Prep run {run_id} failed: {error_msg}")
+        logger.error(traceback.format_exc())
+        _interview_prep_runs[run_id].status = AgentStatus.FAILED
+        _interview_prep_runs[run_id].errors.append(error_msg)
+    finally:
+        _interview_prep_runs[run_id].completed_at = datetime.utcnow()
+
+
+@router.post("/interview/prep", response_model=InterviewPrepResponse)
+async def start_interview_prep(
+    request: InterviewPrepRequest,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Start an Interview Prep agent run.
+
+    The agent will:
+    1. Analyze your profile to understand your skills and experience
+    2. Analyze the target job (if provided) to identify requirements
+    3. Identify skill gaps and focus areas
+    4. Create a personalized interview prep plan
+    5. Create a practice session with tailored questions
+    6. Generate personalized prep tips
+
+    Returns immediately with a run_id. Use /interview/status/{run_id} to check progress.
+    """
+    run_id = str(uuid4())
+
+    # Create initial response
+    run_response = InterviewPrepResponse(
+        run_id=run_id,
+        status=AgentStatus.PENDING,
+        user_id=str(current_user.id),
+        started_at=datetime.utcnow(),
+        messages=["Interview Prep run queued"]
+    )
+
+    # Store in memory
+    _interview_prep_runs[run_id] = run_response
+
+    # Start background task
+    background_tasks.add_task(
+        run_interview_prep_agent,
+        run_id=run_id,
+        user_id=str(current_user.id),
+        request=request
+    )
+
+    logger.info(f"Started Interview Prep run {run_id} for user {current_user.id}")
+
+    return run_response
+
+
+@router.get("/interview/status/{run_id}", response_model=InterviewPrepStatusResponse)
+async def get_interview_prep_status(
+    run_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Get the status of an Interview Prep run."""
+    if run_id not in _interview_prep_runs:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    run = _interview_prep_runs[run_id]
+
+    # Verify ownership
+    if run.user_id != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Not authorized to view this run")
+
+    # Calculate progress
+    progress = 0.0
+    current_step = ""
+
+    if run.status == AgentStatus.PENDING:
+        progress = 0.0
+        current_step = "Queued"
+    elif run.status == AgentStatus.RUNNING:
+        if run.session_id:
+            progress = 90.0
+            current_step = "Generating tips"
+        elif run.interview_plan:
+            progress = 70.0
+            current_step = "Creating session"
+        elif run.skill_gaps:
+            progress = 50.0
+            current_step = "Creating prep plan"
+        elif run.focus_areas:
+            progress = 30.0
+            current_step = "Identifying gaps"
+        else:
+            progress = 15.0
+            current_step = "Analyzing profile"
+    elif run.status == AgentStatus.COMPLETED:
+        progress = 100.0
+        current_step = "Complete"
+    elif run.status == AgentStatus.FAILED:
+        progress = 0.0
+        current_step = "Failed"
+
+    return InterviewPrepStatusResponse(
+        run_id=run_id,
+        status=run.status,
+        progress_percent=progress,
+        current_step=current_step,
+        messages=run.messages,
+        errors=run.errors
+    )
+
+
+@router.get("/interview/result/{run_id}", response_model=InterviewPrepResponse)
+async def get_interview_prep_result(
+    run_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Get the full result of a completed Interview Prep run."""
+    if run_id not in _interview_prep_runs:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    run = _interview_prep_runs[run_id]
+
+    # Verify ownership
+    if run.user_id != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Not authorized to view this run")
+
+    return run

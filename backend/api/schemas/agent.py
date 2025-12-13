@@ -96,3 +96,70 @@ class AgentHealthResponse(BaseModel):
     llm_provider: str
     llm_available: bool
     supported_features: List[str]
+
+
+# Interview Prep Agent Schemas
+
+class InterviewPrepRequest(BaseModel):
+    """Request to start an interview prep session."""
+    job_id: Optional[str] = Field(
+        default=None,
+        description="Job ID to tailor interview prep for (optional)"
+    )
+    interview_type: str = Field(
+        default="auto",
+        description="Interview type: behavioral, technical, system_design, case_study, auto"
+    )
+    difficulty: str = Field(
+        default="mid",
+        description="Difficulty level: entry, mid, senior, lead, executive"
+    )
+    num_questions: int = Field(
+        default=5,
+        ge=1,
+        le=20,
+        description="Number of practice questions to generate"
+    )
+
+
+class InterviewPlan(BaseModel):
+    """Interview preparation plan details."""
+    interview_type: str
+    difficulty: str
+    focus_areas: List[str] = []
+    skill_gaps_to_address: List[str] = []
+    target_role: Optional[str] = None
+    target_company: Optional[str] = None
+    recommended_frameworks: List[str] = []
+    question_types: List[str] = []
+
+
+class InterviewPrepResponse(BaseModel):
+    """Response from interview prep agent."""
+    run_id: str
+    status: AgentStatus
+    user_id: str
+    started_at: datetime
+    completed_at: Optional[datetime] = None
+
+    # Results
+    session_id: Optional[str] = None
+    interview_plan: Optional[InterviewPlan] = None
+    prep_tips: List[str] = []
+    focus_areas: List[str] = []
+    skill_gaps: List[str] = []
+    questions_generated: int = 0
+
+    # Progress messages
+    messages: List[str] = []
+    errors: List[str] = []
+
+
+class InterviewPrepStatusResponse(BaseModel):
+    """Status of an interview prep run."""
+    run_id: str
+    status: AgentStatus
+    progress_percent: float = 0.0
+    current_step: str = ""
+    messages: List[str] = []
+    errors: List[str] = []
