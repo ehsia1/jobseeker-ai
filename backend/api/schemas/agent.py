@@ -249,3 +249,109 @@ class ResumeOptimizationStatusResponse(BaseModel):
     current_step: str = ""
     messages: List[str] = []
     errors: List[str] = []
+
+
+# Application Tracker Agent Schemas
+
+class ApplicationTrackerRequest(BaseModel):
+    """Request to get application portfolio briefing."""
+    briefing_type: str = Field(
+        default="daily",
+        description="Briefing type: daily, weekly, full"
+    )
+
+
+class PortfolioAnalysis(BaseModel):
+    """Analysis of the application portfolio."""
+    health_score: int = Field(ge=0, le=100, description="Overall portfolio health score")
+    total_count: int = 0
+    active_count: int = 0
+    interview_count: int = 0
+    offer_count: int = 0
+    response_rate: float = 0.0
+    activity_trend: str = "moderate"
+    insights: List[str] = []
+    status_distribution: Dict[str, int] = {}
+
+
+class StaleApplication(BaseModel):
+    """An application that needs attention."""
+    application_id: str
+    job_title: str
+    company: str
+    status: str
+    days_stale: int
+    threshold: int
+    urgency: str  # high, medium
+    reason: str
+
+
+class Recommendation(BaseModel):
+    """Strategic recommendation for job search."""
+    type: str  # strategy, preparation
+    title: str
+    description: str
+    priority: str  # high, medium, low
+
+
+class ActionItem(BaseModel):
+    """Action item requiring user attention."""
+    type: str  # follow_up, reminder, upcoming
+    priority: str  # high, medium, low
+    title: str
+    description: str
+    application_id: Optional[str] = None
+    reminder_id: Optional[str] = None
+
+
+class ApplicationStats(BaseModel):
+    """Quick application statistics."""
+    total_applications: int = 0
+    active_applications: int = 0
+    response_rate: float = 0.0
+    upcoming_reminders: int = 0
+    overdue_reminders: int = 0
+    by_status: Dict[str, int] = {}
+
+
+class ApplicationTrackerResponse(BaseModel):
+    """Response from application tracker agent."""
+    run_id: str
+    status: AgentStatus
+    user_id: str
+    started_at: datetime
+    completed_at: Optional[datetime] = None
+
+    # Results
+    briefing: str = ""
+    portfolio_analysis: Optional[PortfolioAnalysis] = None
+    stale_applications: List[StaleApplication] = []
+    recommendations: List[Recommendation] = []
+    action_items: List[ActionItem] = []
+    stats: Optional[ApplicationStats] = None
+
+    # Progress messages
+    messages: List[str] = []
+    errors: List[str] = []
+
+
+class ApplicationTrackerStatusResponse(BaseModel):
+    """Status of an application tracker run."""
+    run_id: str
+    status: AgentStatus
+    progress_percent: float = 0.0
+    current_step: str = ""
+    messages: List[str] = []
+    errors: List[str] = []
+
+
+class QuickStatsResponse(BaseModel):
+    """Quick application stats for dashboard."""
+    success: bool
+    total_applications: int = 0
+    active_applications: int = 0
+    response_rate: float = 0.0
+    upcoming_reminders: int = 0
+    overdue_reminders: int = 0
+    by_status: Dict[str, int] = {}
+    error: Optional[str] = None

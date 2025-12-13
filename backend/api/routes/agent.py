@@ -29,6 +29,15 @@ from backend.api.schemas.agent import (
     ResumeOptimizationResult,
     ResumeSection,
     ATSScore,
+    ApplicationTrackerRequest,
+    ApplicationTrackerResponse,
+    ApplicationTrackerStatusResponse,
+    PortfolioAnalysis,
+    StaleApplication,
+    Recommendation,
+    ActionItem,
+    ApplicationStats,
+    QuickStatsResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -39,6 +48,7 @@ router = APIRouter()
 _agent_runs: Dict[str, AgentRunResponse] = {}
 _interview_prep_runs: Dict[str, InterviewPrepResponse] = {}
 _resume_optimization_runs: Dict[str, ResumeOptimizationResponse] = {}
+_application_tracker_runs: Dict[str, ApplicationTrackerResponse] = {}
 
 
 async def run_job_radar_agent(
@@ -268,7 +278,8 @@ async def agent_health():
             "job_scoring",
             "proposal_generation",
             "interview_prep",
-            "resume_optimization"
+            "resume_optimization",
+            "application_tracker"
         ]
     )
 
@@ -721,3 +732,283 @@ async def get_resume_optimization_result(
         raise HTTPException(status_code=403, detail="Not authorized to view this run")
 
     return run
+
+
+# ============================================================================
+# Application Tracker Agent Routes
+# ============================================================================
+
+async def run_application_tracker_agent(
+    run_id: str,
+    user_id: str,
+    request: ApplicationTrackerRequest
+):
+    """Background task to run the Application Tracker agent."""
+    from backend.agents.application_tracker_agent import ApplicationTrackerAgent
+    from backend.database import async_session
+
+    try:
+        # Update status to running
+        _application_tracker_runs[run_id].status = AgentStatus.RUNNING
+        _application_tracker_runs[run_id].messages.append("Starting Application Tracker agent...")
+
+        # Create a new database session for this background task
+        async with async_session() as db:
+            # Initialize agent
+            agent = ApplicationTrackerAgent(db)
+            _application_tracker_runs[run_id].messages.append("Agent initialized")
+
+            # Run the agent
+            result = await agent.run(
+                user_id=user_id,
+                briefing_type=request.briefing_type
+            )
+
+            # Process results
+            if result.get("success"):
+                _application_tracker_runs[run_id].briefing = result.get("briefing", "")
+
+                # Convert portfolio analysis
+                portfolio_data = result.get("portfolio_analysis", {})
+                if portfolio_data:
+                    _application_tracker_runs[run_id].portfolio_analysis = PortfolioAnalysis(
+                        health_score=portfolio_data.get("health_score", 0),
+                        total_count=portfolio_data.get("total_count", 0),
+                        active_count=portfolio_data.get("active_count", 0),
+                        interview_count=portfolio_data.get("interview_count", 0),
+                        offer_count=portfolio_data.get("offer_count", 0),
+                        response_rate=portfolio_data.get("response_rate", 0),
+                        activity_trend=portfolio_data.get("activity_trend", "moderate"),
+                        insights=portfolio_data.get("insights", []),
+                        status_distribution=portfolio_data.get("status_distribution", {})
+                    )
+
+                # Convert stale applications
+                for stale in result.get("stale_applications", []):
+                    _application_tracker_runs[run_id].stale_applications.append(
+                        StaleApplication(
+                            application_id=stale.get("application_id", ""),
+                            job_title=stale.get("job_title", ""),
+                            company=stale.get("company", ""),
+                            status=stale.get("status", ""),
+                            days_stale=stale.get("days_stale", 0),
+                            threshold=stale.get("threshold", 0),
+                            urgency=stale.get("urgency", "medium"),
+                            reason=stale.get("reason", "")
+                        )
+                    )
+
+                # Convert recommendations
+                for rec in result.get("recommendations", []):
+                    _application_tracker_runs[run_id].recommendations.append(
+                        Recommendation(
+                            type=rec.get("type", "strategy"),
+                            title=rec.get("title", ""),
+                            description=rec.get("description", ""),
+                            priority=rec.get("priority", "medium")
+                        )
+                    )
+
+                # Convert action items
+                for item in result.get("action_items", []):
+                    _application_tracker_runs[run_id].action_items.append(
+                        ActionItem(
+                            type=item.get("type", "follow_up"),
+                            priority=item.get("priority", "medium"),
+                            title=item.get("title", ""),
+                            description=item.get("description", ""),
+                            application_id=item.get("application_id"),
+                            reminder_id=item.get("reminder_id")
+                        )
+                    )
+
+                # Convert stats
+                stats_data = result.get("stats", {})
+                if stats_data:
+                    _application_tracker_runs[run_id].stats = ApplicationStats(
+                        total_applications=stats_data.get("total_applications", 0),
+                        active_applications=stats_data.get("active_applications", 0),
+                        response_rate=stats_data.get("response_rate", 0),
+                        upcoming_reminders=0,  # Not in current stats
+                        overdue_reminders=0,
+                        by_status=stats_data.get("by_status", {})
+                    )
+
+                _application_tracker_runs[run_id].status = AgentStatus.COMPLETED
+
+                # Summary message
+                stale_count = len(result.get("stale_applications", []))
+                action_count = len(result.get("action_items", []))
+                _application_tracker_runs[run_id].messages.append(
+                    f"Completed! Found {stale_count} stale applications and {action_count} action items"
+                )
+            else:
+                _application_tracker_runs[run_id].status = AgentStatus.FAILED
+                error_msg = result.get("error", "Unknown error")
+                _application_tracker_runs[run_id].errors.append(error_msg)
+                logger.error(f"Application Tracker run {run_id} failed: {error_msg}")
+
+    except Exception as e:
+        import traceback
+        error_msg = f"{type(e).__name__}: {e}"
+        logger.error(f"Application Tracker run {run_id} failed: {error_msg}")
+        logger.error(traceback.format_exc())
+        _application_tracker_runs[run_id].status = AgentStatus.FAILED
+        _application_tracker_runs[run_id].errors.append(error_msg)
+    finally:
+        _application_tracker_runs[run_id].completed_at = datetime.utcnow()
+
+
+@router.post("/tracker/briefing", response_model=ApplicationTrackerResponse)
+async def start_application_tracker(
+    request: ApplicationTrackerRequest,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Start an Application Tracker agent run.
+
+    The agent will:
+    1. Load all your job applications with their timelines and reminders
+    2. Analyze your portfolio health and status distribution
+    3. Detect stale applications that need follow-up
+    4. Generate smart recommendations and action items
+    5. Create a personalized briefing (daily, weekly, or full)
+
+    Returns immediately with a run_id. Use /tracker/status/{run_id} to check progress.
+    """
+    run_id = str(uuid4())
+
+    # Create initial response
+    run_response = ApplicationTrackerResponse(
+        run_id=run_id,
+        status=AgentStatus.PENDING,
+        user_id=str(current_user.id),
+        started_at=datetime.utcnow(),
+        messages=["Application Tracker run queued"]
+    )
+
+    # Store in memory
+    _application_tracker_runs[run_id] = run_response
+
+    # Start background task
+    background_tasks.add_task(
+        run_application_tracker_agent,
+        run_id=run_id,
+        user_id=str(current_user.id),
+        request=request
+    )
+
+    logger.info(f"Started Application Tracker run {run_id} for user {current_user.id}")
+
+    return run_response
+
+
+@router.get("/tracker/status/{run_id}", response_model=ApplicationTrackerStatusResponse)
+async def get_application_tracker_status(
+    run_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Get the status of an Application Tracker run."""
+    if run_id not in _application_tracker_runs:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    run = _application_tracker_runs[run_id]
+
+    # Verify ownership
+    if run.user_id != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Not authorized to view this run")
+
+    # Calculate progress
+    progress = 0.0
+    current_step = ""
+
+    if run.status == AgentStatus.PENDING:
+        progress = 0.0
+        current_step = "Queued"
+    elif run.status == AgentStatus.RUNNING:
+        if run.briefing:
+            progress = 95.0
+            current_step = "Finalizing briefing"
+        elif run.action_items:
+            progress = 80.0
+            current_step = "Generating recommendations"
+        elif run.stale_applications:
+            progress = 60.0
+            current_step = "Generating action items"
+        elif run.portfolio_analysis:
+            progress = 40.0
+            current_step = "Detecting stale applications"
+        else:
+            progress = 20.0
+            current_step = "Loading applications"
+    elif run.status == AgentStatus.COMPLETED:
+        progress = 100.0
+        current_step = "Complete"
+    elif run.status == AgentStatus.FAILED:
+        progress = 0.0
+        current_step = "Failed"
+
+    return ApplicationTrackerStatusResponse(
+        run_id=run_id,
+        status=run.status,
+        progress_percent=progress,
+        current_step=current_step,
+        messages=run.messages,
+        errors=run.errors
+    )
+
+
+@router.get("/tracker/result/{run_id}", response_model=ApplicationTrackerResponse)
+async def get_application_tracker_result(
+    run_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Get the full result of a completed Application Tracker run."""
+    if run_id not in _application_tracker_runs:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    run = _application_tracker_runs[run_id]
+
+    # Verify ownership
+    if run.user_id != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Not authorized to view this run")
+
+    return run
+
+
+@router.get("/tracker/quick-stats", response_model=QuickStatsResponse)
+async def get_quick_stats(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get quick application stats for dashboard display.
+
+    This is a lightweight endpoint that returns basic stats
+    without running the full agent workflow.
+    """
+    from backend.agents.application_tracker_agent import ApplicationTrackerAgent
+
+    try:
+        agent = ApplicationTrackerAgent(db)
+        result = await agent.get_quick_stats(str(current_user.id))
+
+        return QuickStatsResponse(
+            success=result.get("success", False),
+            total_applications=result.get("total_applications", 0),
+            active_applications=result.get("active_applications", 0),
+            response_rate=result.get("response_rate", 0),
+            upcoming_reminders=result.get("upcoming_reminders", 0),
+            overdue_reminders=result.get("overdue_reminders", 0),
+            by_status=result.get("by_status", {}),
+            error=result.get("error")
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting quick stats: {e}")
+        return QuickStatsResponse(
+            success=False,
+            error=str(e)
+        )
