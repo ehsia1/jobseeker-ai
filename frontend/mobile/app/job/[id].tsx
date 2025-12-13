@@ -312,21 +312,32 @@ export default function JobDetailsScreen() {
             style={styles.modalKeyboardView}
           >
             <Surface style={styles.modalContainer}>
-              <Text variant="titleLarge" style={styles.modalTitle}>
-                Generate Proposal
-              </Text>
-              <Text variant="bodyMedium" style={styles.modalSubtitle}>
-                Generate a custom proposal for this job using AI
-              </Text>
+              {/* Header with close button */}
+              <View style={styles.modalHeader}>
+                <View style={styles.modalHeaderText}>
+                  <Text variant="titleLarge" style={styles.modalTitle}>
+                    Generate Proposal
+                  </Text>
+                  <Text variant="bodyMedium" style={styles.modalSubtitle}>
+                    Generate a custom proposal for this job using AI
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => setShowProposalModal(false)}
+                  style={styles.closeIconButton}
+                >
+                  <Ionicons name="close" size={24} color="#6b7280" />
+                </Pressable>
+              </View>
 
               {proposal ? (
-                <>
-                  <ScrollView style={styles.proposalScroll}>
+                <View style={styles.proposalContent}>
+                  <ScrollView style={styles.proposalScroll} nestedScrollEnabled>
                     <TextInput
                       value={proposal}
                       onChangeText={setProposal}
                       multiline
-                      numberOfLines={10}
+                      numberOfLines={12}
                       style={styles.proposalInput}
                       mode="outlined"
                     />
@@ -337,6 +348,7 @@ export default function JobDetailsScreen() {
                       onPress={handleCopyProposal}
                       icon="content-copy"
                       style={styles.modalButton}
+                      contentStyle={styles.modalButtonContent}
                     >
                       Copy
                     </Button>
@@ -344,12 +356,13 @@ export default function JobDetailsScreen() {
                       mode="contained"
                       onPress={handleMarkApplied}
                       icon="check"
-                      style={styles.modalButton}
+                      style={[styles.modalButton, styles.primaryButton]}
+                      contentStyle={styles.modalButtonContent}
                     >
                       Mark Applied
                     </Button>
                   </View>
-                </>
+                </View>
               ) : (
                 <View style={styles.generateContainer}>
                   <Button
@@ -358,19 +371,19 @@ export default function JobDetailsScreen() {
                     loading={isGenerating}
                     disabled={isGenerating}
                     icon="auto-fix"
+                    contentStyle={styles.generateButtonContent}
                   >
                     {isGenerating ? 'Generating...' : 'Generate Proposal'}
                   </Button>
+                  <Button
+                    mode="text"
+                    onPress={() => setShowProposalModal(false)}
+                    style={styles.cancelButton}
+                  >
+                    Cancel
+                  </Button>
                 </View>
               )}
-
-              <Button
-                mode="text"
-                onPress={() => setShowProposalModal(false)}
-                style={styles.closeButton}
-              >
-                Close
-              </Button>
             </Surface>
           </KeyboardAvoidingView>
         </View>
@@ -553,12 +566,26 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     backgroundColor: '#fff',
-    marginHorizontal: 20,
+    marginHorizontal: 16,
+    borderRadius: 16,
+    width: '92%',
     padding: 20,
-    borderRadius: 12,
-    maxHeight: '80%',
-    width: '90%',
     elevation: 5,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 20,
+  },
+  modalHeaderText: {
+    flex: 1,
+    marginRight: 12,
+  },
+  closeIconButton: {
+    padding: 4,
+    marginTop: -4,
+    marginRight: -4,
   },
   modalTitle: {
     fontWeight: '700',
@@ -566,27 +593,44 @@ const styles = StyleSheet.create({
   },
   modalSubtitle: {
     color: '#6b7280',
-    marginBottom: 20,
+  },
+  proposalContent: {
+    // Container for proposal text + action buttons
   },
   proposalScroll: {
-    maxHeight: 300,
+    maxHeight: 280,
     marginBottom: 16,
   },
   proposalInput: {
     backgroundColor: '#f9fafb',
+    minHeight: 200,
   },
   modalActions: {
     flexDirection: 'row',
     gap: 12,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
   },
   modalButton: {
     flex: 1,
   },
-  generateContainer: {
-    paddingVertical: 24,
-    alignItems: 'center',
+  modalButtonContent: {
+    paddingVertical: 6,
   },
-  closeButton: {
-    marginTop: 12,
+  primaryButton: {
+    flex: 1.5,
+  },
+  generateContainer: {
+    paddingVertical: 32,
+    alignItems: 'center',
+    gap: 16,
+  },
+  generateButtonContent: {
+    paddingVertical: 8,
+    paddingHorizontal: 24,
+  },
+  cancelButton: {
+    marginTop: 8,
   },
 });

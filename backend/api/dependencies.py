@@ -138,8 +138,8 @@ class UsageChecker:
         db: AsyncSession = Depends(get_db),
     ):
         """Check usage limits and optionally record usage."""
-        # Skip in demo mode with no user
-        if settings.demo_mode and current_user is None:
+        # Skip usage limits entirely in demo mode
+        if settings.demo_mode:
             return None
 
         if current_user is None:
@@ -265,8 +265,8 @@ class FeatureGate:
         db: AsyncSession = Depends(get_db),
     ):
         """Check if user has access to the feature."""
-        # Skip in demo mode with no user (allow all features)
-        if settings.demo_mode and current_user is None:
+        # Skip feature gates entirely in demo mode (allow all features)
+        if settings.demo_mode:
             return True
 
         if current_user is None:
