@@ -20,7 +20,7 @@ import {
 } from 'react-native-paper';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useJob, useMatchesInfinite, useSaveJob } from '../../src/hooks/useJobs';
+import { useJob, useMatchesInfinite, useSaveJob, useUpdateMatchStatus } from '../../src/hooks/useJobs';
 import { ScoreBreakdownBar } from '../../src/components/ScoreBadge';
 import { matchesApi, proposalsApi } from '../../src/api/client';
 import type { ScoredJob, MatchStatus } from '@jobseeker/shared';
@@ -33,6 +33,7 @@ export default function JobDetailsScreen() {
   // Fetch matches to check if job is saved
   const { data: matchesData } = useMatchesInfinite();
   const saveJobMutation = useSaveJob();
+  const updateStatusMutation = useUpdateMatchStatus();
 
   const [showProposalModal, setShowProposalModal] = useState(false);
   const [proposal, setProposal] = useState('');
@@ -96,12 +97,17 @@ export default function JobDetailsScreen() {
   const handleMarkApplied = async () => {
     if (!job) return;
     try {
-      if (existingMatch) {
-        await matchesApi.updateStatus(existingMatch.id, 'applied');
-      } else {
+      let matchId = existingMatch?.id;
+
+      // Create match if it doesn't exist
+      if (!matchId) {
         const match = await matchesApi.create(job.id);
-        await matchesApi.updateStatus(match.id, 'applied');
+        matchId = match.id;
       }
+
+      // Use the mutation hook to update status (invalidates cache)
+      await updateStatusMutation.mutateAsync({ matchId, status: 'applied' });
+
       setShowProposalModal(false);
       Alert.alert('Success', 'Job marked as applied!');
       router.back();
