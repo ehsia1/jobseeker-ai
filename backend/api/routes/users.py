@@ -17,7 +17,7 @@ from backend.api.routes.auth import get_current_user
 router = APIRouter()
 
 
-@router.get("/profile", response_model=UserProfileRead)
+@router.get("/profile/", response_model=UserProfileRead)
 async def get_user_profile(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
@@ -38,7 +38,7 @@ async def get_user_profile(
     return profile
 
 
-@router.put("/profile", response_model=UserProfileRead)
+@router.put("/profile/", response_model=UserProfileRead)
 async def update_user_profile(
     profile_data: UserProfileUpdate,
     current_user: User = Depends(get_current_user),
@@ -67,7 +67,7 @@ async def update_user_profile(
     return profile
 
 
-@router.delete("/profile")
+@router.delete("/profile/")
 async def delete_user_profile(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
@@ -86,7 +86,7 @@ async def delete_user_profile(
     return {"message": "Profile deleted successfully"}
 
 
-@router.get("/me", response_model=UserWithProfile)
+@router.get("/me/", response_model=UserWithProfile)
 async def get_current_user_detailed(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
@@ -107,7 +107,7 @@ async def get_current_user_detailed(
 
 
 # Notification routes
-@router.get("/me/notifications")
+@router.get("/me/notifications/")
 async def get_user_notifications(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
@@ -142,7 +142,7 @@ async def get_user_notifications(
     }
 
 
-@router.put("/me/notifications/{notification_id}/read")
+@router.put("/me/notifications/{notification_id}/read/")
 async def mark_notification_read(
     notification_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -170,7 +170,7 @@ async def mark_notification_read(
     return notification
 
 
-@router.put("/me/notifications/read-all")
+@router.put("/me/notifications/read-all/")
 async def mark_all_notifications_read(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
