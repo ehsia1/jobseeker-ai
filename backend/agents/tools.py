@@ -2,7 +2,7 @@
 
 from typing import List, Dict, Any, Optional
 from langchain.tools import tool
-from langchain_core.pydantic_v1 import BaseModel, Field
+from pydantic import BaseModel, Field
 import asyncio
 import logging
 
@@ -180,13 +180,34 @@ async def score_jobs(job_ids: List[str], user_id: str) -> Dict[str, Any]:
             scoring_service = ScoringService(embedding_service)
             
             scored_jobs = []
-            
+
             for job_id in job_ids:
-                # Get job
-                job_result = await db.execute(
-                    select(Job).where(Job.id == job_id)
-                )
-                job = job_result.scalar_one_or_none()
+                # Parse composite job_id (format: "source_sourceId" or hash)
+                # e.g., "RemoteOK_1129173" -> source="RemoteOK", source_id="1129173"
+                job = None
+                if "_" in job_id:
+                    parts = job_id.split("_", 1)
+                    source = parts[0]
+                    source_id = parts[1] if len(parts) > 1 else None
+
+                    # Query by source and source_id
+                    job_result = await db.execute(
+                        select(Job).where(
+                            Job.source == source,
+                            Job.source_id == source_id
+                        )
+                    )
+                    job = job_result.scalar_one_or_none()
+
+                # If not found by source_id, try as UUID (backward compatibility)
+                if not job:
+                    try:
+                        job_result = await db.execute(
+                            select(Job).where(Job.id == job_id)
+                        )
+                        job = job_result.scalar_one_or_none()
+                    except Exception:
+                        pass  # Invalid UUID format, skip
                 
                 if job:
                     # Score the job
@@ -241,17 +262,36 @@ async def generate_proposal(
         from sqlalchemy import select
         
         async with get_async_session() as db:
-            # Get job and profile
-            job_result = await db.execute(
-                select(Job).where(Job.id == job_id)
-            )
-            job = job_result.scalar_one_or_none()
-            
+            # Parse composite job_id (format: "source_sourceId" or hash)
+            job = None
+            if "_" in job_id:
+                parts = job_id.split("_", 1)
+                source = parts[0]
+                source_id = parts[1] if len(parts) > 1 else None
+
+                job_result = await db.execute(
+                    select(Job).where(
+                        Job.source == source,
+                        Job.source_id == source_id
+                    )
+                )
+                job = job_result.scalar_one_or_none()
+
+            # Fallback to UUID lookup
+            if not job:
+                try:
+                    job_result = await db.execute(
+                        select(Job).where(Job.id == job_id)
+                    )
+                    job = job_result.scalar_one_or_none()
+                except Exception:
+                    pass
+
             profile_result = await db.execute(
                 select(UserProfile).where(UserProfile.user_id == user_id)
             )
             profile = profile_result.scalar_one_or_none()
-            
+
             if not job or not profile:
                 return {
                     "success": False,

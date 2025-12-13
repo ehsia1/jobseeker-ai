@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     jwt_algorithm: str = Field(default="HS256", env="JWT_ALGORITHM")
     jwt_expiration_hours: int = Field(default=24, env="JWT_EXPIRATION_HOURS")
     allowed_origins: str = Field(
-        default="http://localhost:3000,http://localhost:8080",
+        default="http://localhost:3000,http://localhost:8080,http://localhost:8081,http://192.168.1.160:8080,http://192.168.1.160:8081,http://10.0.2.2:8080,http://10.0.2.2:8081",
         validation_alias="ALLOWED_ORIGINS"
     )
 

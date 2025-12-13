@@ -145,9 +145,14 @@ class JobSearchService:
         
         # Remove duplicates
         unique_results = self._deduplicate_results(all_results)
-        
+
+        # Store jobs in database so they can be scored/retrieved later
+        stored_count = await self._store_search_results(unique_results)
+        logger.info(f"Stored {stored_count} new jobs from keyword search")
+
         return {
             "total_results": len(unique_results),
+            "stored_jobs": stored_count,
             "source_stats": source_stats,
             "results": [self._serialize_result(r) for r in unique_results[:100]]
         }
@@ -208,56 +213,74 @@ class JobSearchService:
     async def _store_search_results(self, results: List[SearchResult]) -> int:
         """Store search results in database."""
         stored_count = 0
-        
+
         for result in results:
             try:
+                # Truncate fields to fit database constraints
+                title = (result.title or "")[:255]
+                company = (result.company or "")[:255]
+                location = (result.location or "")[:255] if result.location else None
+                url = (result.url or "")[:500] if result.url else None
+                source_id = (result.source_id or "")[:255] if result.source_id else None
+
                 # Check if job already exists
                 existing = await self.db.execute(
                     select(Job).where(
                         Job.source == result.source,
-                        Job.title == result.title,
-                        Job.company == result.company
+                        Job.title == title,
+                        Job.company == company
                     )
                 )
-                
+
                 if existing.scalar_one_or_none():
                     continue
-                
+
                 # Create new job
                 job = Job(
                     source=result.source,
-                    source_id=result.source_id,
-                    title=result.title,
-                    company=result.company,
+                    source_id=source_id,
+                    title=title,
+                    company=company,
                     description=result.description,
                     requirements=[],  # Could extract from description
                     skills=result.skills or [],
                     rate_min=result.salary_min,
                     rate_max=result.salary_max,
                     rate_type=result.salary_type,
-                    location=result.location,
+                    location=location,
                     remote=result.remote,
                     posted_at=result.posted_date,
-                    url=result.url,
+                    url=url,
                     raw_data=result.raw_data or {}
                 )
-                
+
                 self.db.add(job)
                 stored_count += 1
-                
+
             except Exception as e:
                 logger.error(f"Error storing job: {e}")
+                await self.db.rollback()  # Rollback to clear the failed transaction
                 continue
-        
+
         if stored_count > 0:
             await self.db.commit()
             logger.info(f"Stored {stored_count} new jobs")
-        
+
         return stored_count
     
     def _serialize_result(self, result: SearchResult) -> Dict[str, Any]:
         """Serialize SearchResult for API response."""
+        import hashlib
+        # Generate a unique ID if source_id is not available
+        if result.source_id:
+            job_id = f"{result.source}_{result.source_id}"
+        else:
+            # Create hash from source+title+company
+            hash_str = f"{result.source}_{result.title}_{result.company or ''}"
+            job_id = hashlib.md5(hash_str.encode()).hexdigest()[:16]
+
         return {
+            "id": job_id,
             "source": result.source,
             "title": result.title,
             "company": result.company,

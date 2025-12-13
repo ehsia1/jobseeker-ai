@@ -4,14 +4,12 @@ import logging
 from typing import Dict, Any, List, Optional, TypedDict
 from datetime import datetime
 
-from langchain.agents import AgentExecutor, create_openai_tools_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_openai import ChatOpenAI
-from langchain_anthropic import ChatAnthropic
 from langgraph.graph import StateGraph, END
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.agents.tools import JOBSEEKER_TOOLS
+from backend.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -28,43 +26,79 @@ class AgentState(TypedDict):
     notifications_sent: bool
     messages: List[str]
     errors: List[str]
+    # Config
+    min_score: float
+    generate_proposals: bool
+    max_proposals: int
 
 
 class JobRadarAgent:
     """Main agent for job discovery and matching."""
-    
-    def __init__(self, llm_provider: str = "openai", api_key: str = None):
+
+    def __init__(self, db: Optional[AsyncSession] = None):
         """
         Initialize the JobRadar agent.
-        
+
         Args:
-            llm_provider: LLM provider to use ("openai" or "anthropic")
-            api_key: API key for the LLM provider
+            db: Optional database session for direct queries
         """
-        self.llm_provider = llm_provider
-        
-        # Initialize LLM
-        if llm_provider == "openai":
-            self.llm = ChatOpenAI(
-                model="gpt-4o-mini",
-                temperature=0.7,
-                api_key=api_key
-            )
-        elif llm_provider == "anthropic":
-            self.llm = ChatAnthropic(
-                model="claude-3-haiku-20240307",
-                temperature=0.7,
-                api_key=api_key
-            )
-        else:
-            # Default to a mock LLM for testing
-            from langchain_community.llms import FakeListLLM
-            self.llm = FakeListLLM(
-                responses=["I'll help you find the best jobs."]
-            )
-        
+        self.db = db
+        self.llm_provider = settings.llm_provider
+
+        # Initialize LLM based on settings
+        self.llm = self._init_llm()
+
         # Build the workflow graph
         self.workflow = self._build_workflow()
+
+    def _init_llm(self):
+        """Initialize the LLM based on settings."""
+        provider = settings.llm_provider
+
+        if provider == "ollama":
+            try:
+                from langchain_ollama import ChatOllama
+                return ChatOllama(
+                    model=settings.ollama_model,
+                    base_url=settings.ollama_base_url,
+                    temperature=0.7
+                )
+            except ImportError:
+                logger.warning("langchain-ollama not installed, falling back to mock LLM")
+                return self._get_mock_llm()
+
+        elif provider == "openai":
+            try:
+                from langchain_openai import ChatOpenAI
+                return ChatOpenAI(
+                    model="gpt-4o-mini",
+                    temperature=0.7,
+                    api_key=settings.openai_api_key
+                )
+            except ImportError:
+                logger.warning("langchain-openai not installed")
+                return self._get_mock_llm()
+
+        elif provider == "anthropic":
+            try:
+                from langchain_anthropic import ChatAnthropic
+                return ChatAnthropic(
+                    model="claude-3-haiku-20240307",
+                    temperature=0.7,
+                    api_key=settings.anthropic_api_key
+                )
+            except ImportError:
+                logger.warning("langchain-anthropic not installed")
+                return self._get_mock_llm()
+        else:
+            return self._get_mock_llm()
+
+    def _get_mock_llm(self):
+        """Get a mock LLM for testing."""
+        from langchain_community.llms import FakeListLLM
+        return FakeListLLM(
+            responses=["I'll help you find the best jobs."]
+        )
     
     def _build_workflow(self):
         """Build the LangGraph workflow for job search."""
@@ -182,55 +216,63 @@ class JobRadarAgent:
     async def filter_matches_node(self, state: AgentState) -> AgentState:
         """Filter top matches based on scores."""
         logger.info("Filtering top matches")
-        
+
+        min_score = state.get("min_score", 70.0)
+
         try:
-            # Get jobs with score >= 70
+            # Get jobs with score >= min_score
             if state.get("scored_jobs"):
                 state["top_matches"] = [
                     job for job in state["scored_jobs"]
-                    if job["total_score"] >= 70
+                    if job["total_score"] >= min_score
                 ][:10]  # Top 10 matches
-                
+
                 state["messages"].append(
-                    f"✓ Found {len(state['top_matches'])} high-quality matches (score ≥ 70)"
+                    f"✓ Found {len(state['top_matches'])} high-quality matches (score ≥ {min_score})"
                 )
             else:
                 state["top_matches"] = []
                 state["messages"].append("No matches found")
-                
+
         except Exception as e:
             state["errors"].append(f"Error filtering matches: {str(e)}")
-        
+
         return state
     
     async def generate_proposals_node(self, state: AgentState) -> AgentState:
         """Generate proposals for top matches."""
-        logger.info(f"Generating proposals for {len(state.get('top_matches', []))} jobs")
-        
+        # Check if proposal generation is enabled
+        if not state.get("generate_proposals", True):
+            state["messages"].append("Skipping proposal generation (disabled)")
+            return state
+
+        max_proposals = state.get("max_proposals", 5)
+        logger.info(f"Generating up to {max_proposals} proposals for top matches")
+
         try:
             from backend.agents.tools import generate_proposal
-            
+
             state["proposals"] = {}
-            
-            # Generate proposals for top 5 matches
-            for job in state.get("top_matches", [])[:5]:
+
+            # Generate proposals for top N matches
+            for job in state.get("top_matches", [])[:max_proposals]:
                 result = await generate_proposal.ainvoke({
                     "job_id": job["job_id"],
                     "user_id": state["user_id"],
                     "tone": "professional"
                 })
-                
+
                 if result["success"]:
                     state["proposals"][job["job_id"]] = result["proposal"]
-            
+
             if state["proposals"]:
                 state["messages"].append(
                     f"✓ Generated {len(state['proposals'])} personalized proposals"
                 )
-                
+
         except Exception as e:
             state["errors"].append(f"Error generating proposals: {str(e)}")
-        
+
         return state
     
     async def send_notifications_node(self, state: AgentState) -> AgentState:
@@ -269,22 +311,30 @@ class JobRadarAgent:
     async def run(
         self,
         user_id: str,
-        custom_keywords: Optional[List[str]] = None,
-        profession: Optional[str] = None
+        keywords: Optional[List[str]] = None,
+        profession: Optional[str] = None,
+        remote_only: bool = True,
+        min_score: float = 70.0,
+        generate_proposals: bool = True,
+        max_proposals: int = 5
     ) -> Dict[str, Any]:
         """
         Run the complete job search workflow for a user.
-        
+
         Args:
             user_id: User ID to search for
-            custom_keywords: Optional custom keywords to add to search
+            keywords: Optional custom keywords to add to search
             profession: Optional profession override
-            
+            remote_only: Only search for remote jobs
+            min_score: Minimum match score threshold
+            generate_proposals: Whether to generate proposals for top matches
+            max_proposals: Maximum number of proposals to generate
+
         Returns:
             Dictionary with results and status
         """
         logger.info(f"Starting JobRadar agent for user {user_id}")
-        
+
         # Initialize state
         initial_state: AgentState = {
             "user_id": user_id,
@@ -296,44 +346,65 @@ class JobRadarAgent:
             "proposals": {},
             "notifications_sent": False,
             "messages": [],
-            "errors": []
+            "errors": [],
+            # Config
+            "min_score": min_score,
+            "generate_proposals": generate_proposals,
+            "max_proposals": max_proposals
         }
-        
+
         # Add custom search parameters if provided
-        if custom_keywords or profession:
+        if keywords or profession:
             initial_state["search_query"] = {
-                "keywords": custom_keywords or [],
+                "keywords": keywords or [],
                 "profession": profession,
-                "remote_only": True,
+                "remote_only": remote_only,
                 "limit": 20
             }
-        
+
         # Run the workflow
         try:
             final_state = await self.workflow.ainvoke(initial_state)
-            
+
+            # Build top_matches with proposals attached
+            top_matches_with_proposals = []
+            for match in final_state["top_matches"]:
+                match_data = {
+                    "job_id": match.get("job_id", ""),
+                    "title": match.get("title", ""),
+                    "company": match.get("company", ""),
+                    "location": match.get("location"),
+                    "remote": match.get("remote", False),
+                    "score": match.get("total_score", 0),
+                    "explanation": match.get("explanation"),
+                    "proposal": final_state["proposals"].get(match.get("job_id"))
+                }
+                top_matches_with_proposals.append(match_data)
+
             # Prepare response
             response = {
                 "success": len(final_state["errors"]) == 0,
                 "user_id": user_id,
+                "jobs_found": len(final_state.get("raw_jobs", [])),
+                "jobs_scored": len(final_state.get("scored_jobs", [])),
                 "matches_found": len(final_state["top_matches"]),
                 "proposals_generated": len(final_state["proposals"]),
                 "notifications_sent": final_state["notifications_sent"],
-                "top_matches": final_state["top_matches"][:5],  # Return top 5
+                "top_matches": top_matches_with_proposals,
                 "messages": final_state["messages"],
                 "errors": final_state["errors"],
                 "timestamp": datetime.utcnow().isoformat()
             }
-            
+
             # Log summary
             logger.info(
                 f"JobRadar completed for user {user_id}: "
                 f"{response['matches_found']} matches found, "
                 f"{response['proposals_generated']} proposals generated"
             )
-            
+
             return response
-            
+
         except Exception as e:
             logger.error(f"JobRadar agent failed: {e}")
             return {

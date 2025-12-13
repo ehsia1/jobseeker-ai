@@ -10,7 +10,7 @@ from passlib.context import CryptContext
 
 from backend.database import get_db
 from backend.models.user import User, UserProfile
-from backend.api.schemas.user import UserCreate, UserRead, UserWithProfile
+from backend.api.schemas.user import UserCreate, UserRead, UserWithProfile, UserProfileRead
 from backend.config import settings
 
 router = APIRouter()
@@ -202,8 +202,8 @@ async def get_current_user_info(
     
     user_dict = UserRead.model_validate(user).model_dump()
     if profile:
-        user_dict["profile"] = profile
-    
+        user_dict["profile"] = UserProfileRead.model_validate(profile).model_dump()
+
     return user_dict
 
 

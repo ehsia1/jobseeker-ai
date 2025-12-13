@@ -71,12 +71,12 @@ class UserProfileUpdate(BaseModel):
 class UserProfileRead(UserProfileBase):
     """User profile read schema."""
     model_config = ConfigDict(from_attributes=True)
-    
+
     id: UUID
     user_id: UUID
-    created_at: datetime
-    updated_at: datetime
-    
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
     # Computed properties
     avoid_keywords: List[str] = Field(default_factory=list)
     preferred_industries: List[str] = Field(default_factory=list)

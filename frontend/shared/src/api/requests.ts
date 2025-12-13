@@ -20,7 +20,11 @@ import type {
   ProposalTone,
   EnhancementType,
   PaginatedResponse,
+  AuthResponse,
 } from '../types';
+
+// Re-export AuthResponse from types for convenience
+export type { AuthResponse };
 
 // ============= Auth Requests =============
 export interface LoginRequest {
@@ -32,12 +36,6 @@ export interface RegisterRequest {
   email: string;
   username: string;
   password: string;
-}
-
-export interface AuthResponse {
-  access_token: string;
-  token_type: string;
-  user?: User;
 }
 
 // ============= User Requests =============

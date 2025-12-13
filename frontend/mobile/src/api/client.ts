@@ -335,7 +335,7 @@ export const proposalsApi = {
     jobId: string,
     tone: 'short' | 'medium' | 'full' = 'medium'
   ): Promise<GeneratedProposal> {
-    return apiFetch('/proposals/generate/', {
+    return apiFetch('/proposals/generate', {
       method: 'POST',
       body: JSON.stringify({ job_id: jobId, tone }),
     });
@@ -347,7 +347,7 @@ export const proposalsApi = {
     tone: 'short' | 'medium' | 'full';
     additional_context?: string;
   }): Promise<GeneratedProposal> {
-    return apiFetch('/proposals/generate/', {
+    return apiFetch('/proposals/generate', {
       method: 'POST',
       body: JSON.stringify(request),
     });
@@ -358,7 +358,7 @@ export const proposalsApi = {
     parsed_jd?: ParsedJD;
     additional_context?: string;
   }): Promise<AllTonesResponse> {
-    return apiFetch('/proposals/generate-all/', {
+    return apiFetch('/proposals/generate-all', {
       method: 'POST',
       body: JSON.stringify(request),
     });

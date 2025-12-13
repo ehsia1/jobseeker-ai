@@ -79,7 +79,7 @@ export default function JobDetailsScreen() {
     setIsGenerating(true);
     try {
       const result = await proposalsApi.generate(job.id, 'medium');
-      setProposal(result.proposal);
+      setProposal(result.content);
     } catch (err) {
       console.error('Failed to generate proposal:', err);
     } finally {
