@@ -1,7 +1,7 @@
 """Application Tracker Agent - AI-powered application portfolio intelligence."""
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import TypedDict, Optional, Any
 from enum import Enum
 
@@ -146,11 +146,11 @@ class ApplicationTrackerAgent:
                     "job_id": str(match.job_id),
                     "job_title": match.job.title if match.job else "Unknown",
                     "company": match.job.company if match.job else "Unknown",
-                    "status": match.status.value if match.status else "new",
+                    "status": match.status if match.status else "new",
                     "match_score": match.score,
                     "created_at": match.created_at.isoformat() if match.created_at else None,
                     "updated_at": match.updated_at.isoformat() if match.updated_at else None,
-                    "days_since_update": (datetime.utcnow() - match.updated_at).days if match.updated_at else 0,
+                    "days_since_update": (datetime.now(timezone.utc) - match.updated_at).days if match.updated_at else 0,
                 }
                 applications.append(app_data)
 
@@ -158,8 +158,8 @@ class ApplicationTrackerAgent:
                 for event in match.timeline_entries:
                     all_timeline_events.append({
                         "application_id": str(match.id),
-                        "from_status": event.from_status.value if event.from_status else None,
-                        "to_status": event.to_status.value if event.to_status else None,
+                        "from_status": event.from_status if event.from_status else None,
+                        "to_status": event.to_status if event.to_status else None,
                         "notes": event.notes,
                         "created_at": event.created_at.isoformat() if event.created_at else None,
                     })
@@ -172,12 +172,12 @@ class ApplicationTrackerAgent:
                             "application_id": str(match.id),
                             "job_title": app_data["job_title"],
                             "company": app_data["company"],
-                            "type": reminder.reminder_type.value if reminder.reminder_type else "custom",
+                            "type": reminder.reminder_type if reminder.reminder_type else "custom",
                             "title": reminder.title,
                             "description": reminder.description,
                             "scheduled_for": reminder.scheduled_for.isoformat() if reminder.scheduled_for else None,
                             "is_completed": reminder.is_completed,
-                            "is_overdue": reminder.scheduled_for < datetime.utcnow() if reminder.scheduled_for else False,
+                            "is_overdue": reminder.scheduled_for < datetime.now(timezone.utc) if reminder.scheduled_for else False,
                         })
 
             # Get overall stats
@@ -399,7 +399,7 @@ class ApplicationTrackerAgent:
         ]
         for reminder in upcoming[:3]:
             scheduled = datetime.fromisoformat(reminder["scheduled_for"])
-            if scheduled <= datetime.utcnow() + timedelta(hours=24):
+            if scheduled <= datetime.now(timezone.utc) + timedelta(hours=24):
                 action_items.append({
                     "type": "upcoming",
                     "priority": "medium",

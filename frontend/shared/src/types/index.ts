@@ -518,17 +518,66 @@ export interface ApplicationActionItem {
   due_date?: string;
 }
 
+export interface PortfolioAnalysis {
+  health_score: number;
+  total_count: number;
+  active_count: number;
+  interview_count: number;
+  offer_count: number;
+  response_rate: number;
+  activity_trend: string;
+  insights: string[];
+  status_distribution: Record<string, number>;
+}
+
+export interface StaleApplication {
+  application_id: string;
+  job_title: string;
+  company: string;
+  status: string;
+  days_stale: number;
+  threshold: number;
+  urgency: string;
+  reason: string;
+}
+
+export interface TrackerRecommendation {
+  type: string;
+  title: string;
+  description: string;
+  priority: string;
+}
+
+export interface TrackerActionItem {
+  type: string;
+  priority: string;
+  title: string;
+  description: string;
+  application_id?: string;
+  reminder_id?: string;
+}
+
+export interface ApplicationStats {
+  total_applications: number;
+  active_applications: number;
+  response_rate: number;
+  upcoming_reminders: number;
+  overdue_reminders: number;
+  by_status: Record<string, number>;
+}
+
 export interface ApplicationTrackerResult {
   run_id: string;
   status: AgentStatus;
-  summary?: {
-    total_applications: number;
-    pending_response: number;
-    interviews_scheduled: number;
-    needs_followup: number;
-  };
-  action_items: ApplicationActionItem[];
-  insights: string[];
+  user_id: string;
+  started_at: string;
+  completed_at?: string;
+  briefing: string;
+  portfolio_analysis?: PortfolioAnalysis;
+  stale_applications: StaleApplication[];
+  recommendations: TrackerRecommendation[];
+  action_items: TrackerActionItem[];
+  stats?: ApplicationStats;
   messages: string[];
   errors: string[];
 }

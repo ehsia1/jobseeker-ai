@@ -13,7 +13,7 @@ import { useRouter } from 'expo-router';
 import { useMatchesInfinite } from '../../src/hooks/useJobs';
 import { useApplicationTracker } from '../../src/hooks/useAgent';
 import JobCard from '../../src/components/JobCard';
-import type { JobMatch, ApplicationActionItem } from '@jobseeker/shared';
+import type { JobMatch, TrackerActionItem } from '@jobseeker/shared';
 
 type StatusFilter = 'all' | 'saved' | 'applied' | 'interviewing';
 
@@ -66,9 +66,12 @@ export default function MatchesScreen() {
 
   // Navigate to job from action item
   const handleActionItemPress = useCallback(
-    (item: ApplicationActionItem) => {
+    (item: TrackerActionItem) => {
       setBriefingModalVisible(false);
-      router.push(`/job/${item.job_id}`);
+      if (item.application_id) {
+        // Could navigate to application details if needed
+        router.push(`/matches`);
+      }
     },
     [router]
   );
@@ -299,6 +302,15 @@ export default function MatchesScreen() {
             {/* Results State */}
             {applicationTracker.isCompleted && applicationTracker.result && (
               <>
+                {/* Briefing Text */}
+                {applicationTracker.result.briefing && (
+                  <View style={styles.briefingSection}>
+                    <Text variant="bodyMedium" style={styles.briefingText}>
+                      {applicationTracker.result.briefing}
+                    </Text>
+                  </View>
+                )}
+
                 {/* Summary Stats */}
                 <View style={styles.summarySection}>
                   <Text variant="titleMedium" style={styles.sectionTitle}>
@@ -307,7 +319,7 @@ export default function MatchesScreen() {
                   <View style={styles.statsGrid}>
                     <View style={styles.statCard}>
                       <Text variant="headlineMedium" style={styles.statNumber}>
-                        {applicationTracker.result.summary?.total_applications ?? 0}
+                        {applicationTracker.result.stats?.total_applications ?? 0}
                       </Text>
                       <Text variant="bodySmall" style={styles.statLabel}>
                         Total
@@ -315,15 +327,15 @@ export default function MatchesScreen() {
                     </View>
                     <View style={styles.statCard}>
                       <Text variant="headlineMedium" style={[styles.statNumber, { color: '#f59e0b' }]}>
-                        {applicationTracker.result.summary?.pending_response ?? 0}
+                        {applicationTracker.result.stats?.active_applications ?? 0}
                       </Text>
                       <Text variant="bodySmall" style={styles.statLabel}>
-                        Pending
+                        Active
                       </Text>
                     </View>
                     <View style={styles.statCard}>
                       <Text variant="headlineMedium" style={[styles.statNumber, { color: '#10b981' }]}>
-                        {applicationTracker.result.summary?.interviews_scheduled ?? 0}
+                        {applicationTracker.result.portfolio_analysis?.interview_count ?? 0}
                       </Text>
                       <Text variant="bodySmall" style={styles.statLabel}>
                         Interviews
@@ -331,10 +343,10 @@ export default function MatchesScreen() {
                     </View>
                     <View style={styles.statCard}>
                       <Text variant="headlineMedium" style={[styles.statNumber, { color: '#dc2626' }]}>
-                        {applicationTracker.result.summary?.needs_followup ?? 0}
+                        {applicationTracker.result.stale_applications?.length ?? 0}
                       </Text>
                       <Text variant="bodySmall" style={styles.statLabel}>
-                        Follow-up
+                        Stale
                       </Text>
                     </View>
                   </View>
@@ -348,7 +360,7 @@ export default function MatchesScreen() {
                     </Text>
                     {applicationTracker.result.action_items.map((item, index) => (
                       <TouchableOpacity
-                        key={`${item.job_id}-${index}`}
+                        key={`${item.application_id || index}-${index}`}
                         style={styles.actionItem}
                         onPress={() => handleActionItemPress(item)}
                       >
@@ -366,20 +378,18 @@ export default function MatchesScreen() {
                             >
                               {item.priority}
                             </Chip>
-                            {item.due_date && (
-                              <Text variant="bodySmall" style={styles.dueDate}>
-                                Due: {new Date(item.due_date).toLocaleDateString()}
-                              </Text>
-                            )}
+                            <Chip
+                              style={styles.typeChip}
+                              textStyle={styles.typeChipText}
+                            >
+                              {item.type}
+                            </Chip>
                           </View>
                           <Text variant="bodyMedium" style={styles.actionItemTitle}>
-                            {item.job_title}
-                          </Text>
-                          <Text variant="bodySmall" style={styles.actionItemCompany}>
-                            {item.company}
+                            {item.title}
                           </Text>
                           <Text variant="bodySmall" style={styles.actionItemAction}>
-                            {item.action}
+                            {item.description}
                           </Text>
                         </View>
                       </TouchableOpacity>
@@ -388,16 +398,47 @@ export default function MatchesScreen() {
                 )}
 
                 {/* Insights */}
-                {applicationTracker.result.insights.length > 0 && (
+                {(applicationTracker.result.portfolio_analysis?.insights?.length ?? 0) > 0 && (
                   <View style={styles.insightsSection}>
                     <Text variant="titleMedium" style={styles.sectionTitle}>
                       Insights
                     </Text>
-                    {applicationTracker.result.insights.map((insight, index) => (
+                    {applicationTracker.result.portfolio_analysis?.insights.map((insight, index) => (
                       <View key={index} style={styles.insightItem}>
                         <Text style={styles.insightBullet}>•</Text>
                         <Text variant="bodySmall" style={styles.insightText}>
                           {insight}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {/* Recommendations */}
+                {applicationTracker.result.recommendations.length > 0 && (
+                  <View style={styles.insightsSection}>
+                    <Text variant="titleMedium" style={styles.sectionTitle}>
+                      Recommendations
+                    </Text>
+                    {applicationTracker.result.recommendations.map((rec, index) => (
+                      <View key={index} style={styles.recommendationItem}>
+                        <Chip
+                          style={[
+                            styles.priorityChip,
+                            { backgroundColor: `${getPriorityColor(rec.priority)}20` },
+                          ]}
+                          textStyle={[
+                            styles.priorityChipText,
+                            { color: getPriorityColor(rec.priority) },
+                          ]}
+                        >
+                          {rec.priority}
+                        </Chip>
+                        <Text variant="bodyMedium" style={styles.recommendationTitle}>
+                          {rec.title}
+                        </Text>
+                        <Text variant="bodySmall" style={styles.recommendationDescription}>
+                          {rec.description}
                         </Text>
                       </View>
                     ))}
@@ -739,5 +780,49 @@ const styles = StyleSheet.create({
   insightText: {
     color: '#374151',
     flex: 1,
+  },
+  // Briefing section
+  briefingSection: {
+    padding: 16,
+    backgroundColor: '#f0f9ff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  briefingText: {
+    color: '#1e40af',
+    lineHeight: 22,
+  },
+  // Type chip for action items
+  typeChip: {
+    height: 24,
+    marginLeft: 8,
+  },
+  typeChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'capitalize',
+  },
+  // Recommendations section
+  recommendationsSection: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  recommendationItem: {
+    backgroundColor: '#f9fafb',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#10b981',
+  },
+  recommendationTitle: {
+    color: '#111827',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  recommendationDescription: {
+    color: '#6b7280',
+    lineHeight: 20,
   },
 });
