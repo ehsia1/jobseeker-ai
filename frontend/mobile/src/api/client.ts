@@ -16,6 +16,26 @@ import type {
   Resume,
   SubscriptionWithUsage,
   JobMatchStatus,
+  AgentRunResponse,
+  AgentStatusResponse,
+  JobRadarRequest,
+  JobRadarResult,
+  CoverLetterRequest,
+  CoverLetterResult,
+  ResumeOptimizeRequest,
+  ResumeOptimizeResult,
+  InterviewPrepRequest,
+  InterviewPrepResult,
+  SalaryResearchRequest,
+  SalaryResearchResult,
+  SkillGapRequest,
+  SkillGapResult,
+  ApplicationTrackerRequest,
+  ApplicationTrackerResult,
+  NetworkIntelligenceRequest,
+  NetworkIntelligenceResult,
+  AutoApplyRequest,
+  AutoApplyResult,
 } from '../../shared/src/types';
 
 // For simulators/emulators:
@@ -26,9 +46,9 @@ function getDefaultApiUrl(): string {
     return process.env.EXPO_PUBLIC_API_URL;
   }
   return Platform.select({
-    ios: 'http://192.168.1.160:8080',
-    android: 'http://10.0.2.2:8080',
-    default: 'http://localhost:8080',
+    ios: 'http://192.168.1.160:8000',
+    android: 'http://10.0.2.2:8000',
+    default: 'http://localhost:8000',
   }) as string;
 }
 
@@ -376,5 +396,134 @@ export const subscriptionApi = {
 export const healthApi = {
   async check(): Promise<{ status: string; timestamp: string }> {
     return apiFetch('/health/');
+  },
+};
+
+// Agent API - Generic agent run/status/result pattern
+export const agentApi = {
+  // Job Radar
+  async runJobRadar(request: JobRadarRequest): Promise<AgentRunResponse> {
+    return apiFetch('/agent/radar/run', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  },
+  async getJobRadarStatus(runId: string): Promise<AgentStatusResponse> {
+    return apiFetch(`/agent/radar/status/${runId}`);
+  },
+  async getJobRadarResult(runId: string): Promise<JobRadarResult> {
+    return apiFetch(`/agent/radar/result/${runId}`);
+  },
+
+  // Cover Letter
+  async runCoverLetter(request: CoverLetterRequest): Promise<AgentRunResponse> {
+    return apiFetch('/agent/cover-letter/generate', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  },
+  async getCoverLetterStatus(runId: string): Promise<AgentStatusResponse> {
+    return apiFetch(`/agent/cover-letter/status/${runId}`);
+  },
+  async getCoverLetterResult(runId: string): Promise<CoverLetterResult> {
+    return apiFetch(`/agent/cover-letter/result/${runId}`);
+  },
+
+  // Resume Optimizer
+  async runResumeOptimize(request: ResumeOptimizeRequest): Promise<AgentRunResponse> {
+    return apiFetch('/agent/resume/optimize', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  },
+  async getResumeOptimizeStatus(runId: string): Promise<AgentStatusResponse> {
+    return apiFetch(`/agent/resume/status/${runId}`);
+  },
+  async getResumeOptimizeResult(runId: string): Promise<ResumeOptimizeResult> {
+    return apiFetch(`/agent/resume/result/${runId}`);
+  },
+
+  // Interview Prep
+  async runInterviewPrep(request: InterviewPrepRequest): Promise<AgentRunResponse> {
+    return apiFetch('/agent/interview/prep', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  },
+  async getInterviewPrepStatus(runId: string): Promise<AgentStatusResponse> {
+    return apiFetch(`/agent/interview/status/${runId}`);
+  },
+  async getInterviewPrepResult(runId: string): Promise<InterviewPrepResult> {
+    return apiFetch(`/agent/interview/result/${runId}`);
+  },
+
+  // Salary Research
+  async runSalaryResearch(request: SalaryResearchRequest): Promise<AgentRunResponse> {
+    return apiFetch('/agent/salary/research', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  },
+  async getSalaryResearchStatus(runId: string): Promise<AgentStatusResponse> {
+    return apiFetch(`/agent/salary/status/${runId}`);
+  },
+  async getSalaryResearchResult(runId: string): Promise<SalaryResearchResult> {
+    return apiFetch(`/agent/salary/result/${runId}`);
+  },
+
+  // Skill Gap
+  async runSkillGap(request: SkillGapRequest): Promise<AgentRunResponse> {
+    return apiFetch('/agent/skill-gap/analyze', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  },
+  async getSkillGapStatus(runId: string): Promise<AgentStatusResponse> {
+    return apiFetch(`/agent/skill-gap/status/${runId}`);
+  },
+  async getSkillGapResult(runId: string): Promise<SkillGapResult> {
+    return apiFetch(`/agent/skill-gap/result/${runId}`);
+  },
+
+  // Application Tracker
+  async runApplicationTracker(request: ApplicationTrackerRequest): Promise<AgentRunResponse> {
+    return apiFetch('/agent/tracker/briefing', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  },
+  async getApplicationTrackerStatus(runId: string): Promise<AgentStatusResponse> {
+    return apiFetch(`/agent/tracker/status/${runId}`);
+  },
+  async getApplicationTrackerResult(runId: string): Promise<ApplicationTrackerResult> {
+    return apiFetch(`/agent/tracker/result/${runId}`);
+  },
+
+  // Network Intelligence
+  async runNetworkIntelligence(request: NetworkIntelligenceRequest): Promise<AgentRunResponse> {
+    return apiFetch('/agent/network/analyze', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  },
+  async getNetworkIntelligenceStatus(runId: string): Promise<AgentStatusResponse> {
+    return apiFetch(`/agent/network/status/${runId}`);
+  },
+  async getNetworkIntelligenceResult(runId: string): Promise<NetworkIntelligenceResult> {
+    return apiFetch(`/agent/network/result/${runId}`);
+  },
+
+  // Auto-Apply
+  async runAutoApply(request: AutoApplyRequest): Promise<AgentRunResponse> {
+    return apiFetch('/agent/apply/prepare', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  },
+  async getAutoApplyStatus(runId: string): Promise<AgentStatusResponse> {
+    return apiFetch(`/agent/apply/status/${runId}`);
+  },
+  async getAutoApplyResult(runId: string): Promise<AutoApplyResult> {
+    return apiFetch(`/agent/apply/result/${runId}`);
   },
 };

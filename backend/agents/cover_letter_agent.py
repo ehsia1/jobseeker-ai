@@ -261,8 +261,8 @@ ATS Rules:
                         "skills": job.skills or [],
                         "location": job.location,
                         "remote": job.remote,
-                        "salary_min": float(job.salary_min) if job.salary_min else None,
-                        "salary_max": float(job.salary_max) if job.salary_max else None,
+                        "salary_min": float(job.rate_min) if job.rate_min else None,
+                        "salary_max": float(job.rate_max) if job.rate_max else None,
                     }
                     state["messages"].append(f"Job loaded: {job.title} at {job.company}")
             elif state.get("job_description"):

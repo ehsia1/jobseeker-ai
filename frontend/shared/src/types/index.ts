@@ -294,3 +294,283 @@ export interface Notification {
   read: boolean;
   created_at: string;
 }
+
+// ============= Agent Types =============
+export type AgentStatus = 'pending' | 'running' | 'completed' | 'failed';
+
+// Generic agent response types
+export interface AgentRunResponse {
+  run_id: string;
+  status: AgentStatus;
+  message?: string;
+}
+
+export interface AgentStatusResponse {
+  run_id: string;
+  status: AgentStatus;
+  progress_percent: number;
+  current_step: string;
+  messages: string[];
+  errors: string[];
+}
+
+// Job Radar Agent
+export interface JobRadarRequest {
+  keywords?: string[];
+  profession?: string;
+  remote_only?: boolean;
+  min_score?: number;
+  generate_proposals?: boolean;
+  max_proposals?: number;
+}
+
+export interface JobRadarMatch {
+  job_id: string;
+  title: string;
+  company: string;
+  location?: string;
+  remote: boolean;
+  score: number;
+  explanation?: string;
+  proposal?: string;
+}
+
+export interface JobRadarResult {
+  run_id: string;
+  status: AgentStatus;
+  user_id: string;
+  started_at: string;
+  completed_at?: string;
+  jobs_found: number;
+  jobs_scored: number;
+  matches_found: number;
+  proposals_generated: number;
+  top_matches: JobRadarMatch[];
+  messages: string[];
+  errors: string[];
+}
+
+// Cover Letter Agent
+export type CoverLetterStyle = 'traditional' | 'modern' | 'creative' | 'executive';
+export type CoverLetterLength = 'concise' | 'standard' | 'detailed';
+
+export interface CoverLetterRequest {
+  job_id?: string;
+  job_description?: string;
+  style?: CoverLetterStyle;
+  length?: CoverLetterLength;
+  include_salary_expectations?: boolean;
+  emphasize_remote?: boolean;
+}
+
+export interface SkillAlignment {
+  matched_skills: string[];
+  missing_skills: string[];
+  transferable_skills: string[];
+  alignment_score: number;
+}
+
+export interface ExperienceMatch {
+  requirement: string;
+  match_type: 'direct' | 'transferable' | 'partial' | 'learning';
+  confidence: number;
+  highlight_points: string[];
+}
+
+export interface CoverLetterResultData {
+  cover_letter: string;
+  ats_score: number;
+  keywords_used: string[];
+  keywords_missing: string[];
+  skill_alignment?: SkillAlignment;
+  experience_matches: ExperienceMatch[];
+  suggestions: string[];
+}
+
+export interface CoverLetterResult {
+  run_id: string;
+  status: AgentStatus;
+  user_id: string;
+  started_at: string;
+  completed_at?: string;
+  result?: CoverLetterResultData;
+  target_job_title?: string;
+  target_company?: string;
+  style_used?: string;
+  length_used?: string;
+  messages: string[];
+  errors: string[];
+}
+
+// Resume Optimizer Agent
+export interface ResumeOptimizeRequest {
+  target_job_id?: string;
+  focus_areas?: string[];
+}
+
+export interface ResumeOptimizeSuggestion {
+  category: string;
+  issue: string;
+  fix: string;
+  priority: 'high' | 'medium' | 'low';
+}
+
+export interface ResumeOptimizeResult {
+  run_id: string;
+  status: AgentStatus;
+  ats_score?: number;
+  suggestions: ResumeOptimizeSuggestion[];
+  keywords_missing: string[];
+  keywords_present: string[];
+  section_scores?: Record<string, number>;
+  messages: string[];
+  errors: string[];
+}
+
+// Interview Prep Agent
+export interface InterviewPrepRequest {
+  job_id?: string;
+  interview_type?: 'behavioral' | 'technical' | 'system_design' | 'case_study' | 'auto';
+  difficulty?: 'entry' | 'mid' | 'senior' | 'lead' | 'executive';
+  num_questions?: number;
+}
+
+export interface InterviewQuestion {
+  question: string;
+  type: string;
+  difficulty: string;
+  tips: string[];
+  sample_answer?: string;
+}
+
+export interface InterviewPrepResult {
+  run_id: string;
+  status: AgentStatus;
+  questions: InterviewQuestion[];
+  focus_areas: string[];
+  prep_tips: string[];
+  messages: string[];
+  errors: string[];
+}
+
+// Salary Research Agent
+export interface SalaryResearchRequest {
+  job_id?: string;
+  title?: string;
+  location?: string;
+  skills?: string[];
+  experience_years?: number;
+}
+
+export interface SalaryRange {
+  low: number;
+  median: number;
+  high: number;
+  currency: string;
+}
+
+export interface SalaryResearchResult {
+  run_id: string;
+  status: AgentStatus;
+  market_rate?: SalaryRange;
+  factors: string[];
+  negotiation_tips: string[];
+  comparable_roles: string[];
+  messages: string[];
+  errors: string[];
+}
+
+// Skill Gap Agent
+export interface SkillGapRequest {
+  job_id?: string;
+  target_role?: string;
+}
+
+export interface SkillGapItem {
+  skill: string;
+  importance: 'required' | 'preferred';
+  current_level?: string;
+  resources?: string[];
+}
+
+export interface SkillGapResult {
+  run_id: string;
+  status: AgentStatus;
+  match_score?: number;
+  matched_skills: string[];
+  missing_skills: SkillGapItem[];
+  recommendations: string[];
+  messages: string[];
+  errors: string[];
+}
+
+// Application Tracker Agent
+export interface ApplicationTrackerRequest {
+  include_insights?: boolean;
+}
+
+export interface ApplicationActionItem {
+  job_id: string;
+  job_title: string;
+  company: string;
+  action: string;
+  priority: 'high' | 'medium' | 'low';
+  due_date?: string;
+}
+
+export interface ApplicationTrackerResult {
+  run_id: string;
+  status: AgentStatus;
+  summary?: {
+    total_applications: number;
+    pending_response: number;
+    interviews_scheduled: number;
+    needs_followup: number;
+  };
+  action_items: ApplicationActionItem[];
+  insights: string[];
+  messages: string[];
+  errors: string[];
+}
+
+// Network Intelligence Agent
+export interface NetworkIntelligenceRequest {
+  job_id?: string;
+  company?: string;
+}
+
+export interface NetworkIntelligenceResult {
+  run_id: string;
+  status: AgentStatus;
+  company_insights?: {
+    culture: string[];
+    recent_news: string[];
+    hiring_trends: string[];
+  };
+  potential_connections: string[];
+  outreach_suggestions: string[];
+  messages: string[];
+  errors: string[];
+}
+
+// Auto-Apply Agent
+export interface AutoApplyRequest {
+  job_id: string;
+}
+
+export interface AutoApplyResult {
+  run_id: string;
+  status: AgentStatus;
+  fit_assessment?: {
+    overall_fit: number;
+    strengths: string[];
+    gaps: string[];
+  };
+  prepared_materials?: {
+    cover_letter: string;
+    resume_highlights: string[];
+    screening_answers?: Record<string, string>;
+  };
+  messages: string[];
+  errors: string[];
+}

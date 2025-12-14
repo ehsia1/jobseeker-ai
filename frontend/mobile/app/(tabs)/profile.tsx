@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, StyleSheet, ScrollView, Alert, Linking } from 'react-native';
+import React, { useState } from 'react';
+import { View, StyleSheet, ScrollView, Alert, Linking, TouchableOpacity, Pressable } from 'react-native';
 import {
   Text,
   Button,
@@ -9,12 +9,19 @@ import {
   Divider,
   Switch,
   ActivityIndicator,
+  ProgressBar,
+  Portal,
+  Modal,
+  Chip,
 } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useProfile, useUpdateProfile } from '../../src/hooks/useJobs';
+import { useResumeOptimizer } from '../../src/hooks/useAgent';
 import { resumeApi } from '../../src/api/client';
+import type { ResumeOptimizeSuggestion } from '@jobseeker/shared';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -23,6 +30,10 @@ export default function ProfileScreen() {
   const updateProfile = useUpdateProfile();
   const [pushNotifications, setPushNotifications] = React.useState(true);
   const [isUploadingResume, setIsUploadingResume] = React.useState(false);
+  const [optimizeModalVisible, setOptimizeModalVisible] = useState(false);
+
+  // Resume Optimizer agent
+  const resumeOptimize = useResumeOptimizer();
 
   const handleLogout = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -95,6 +106,28 @@ export default function ProfileScreen() {
       Linking.openURL(user.resume.url);
     } else {
       Alert.alert('Resume', 'Resume preview not available');
+    }
+  };
+
+  const handleOptimizeResume = () => {
+    if (!user?.resume) {
+      Alert.alert('No Resume', 'Please upload a resume first to optimize it.');
+      return;
+    }
+    setOptimizeModalVisible(true);
+    resumeOptimize.run({});
+  };
+
+  const getSuggestionPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'high':
+        return '#dc2626';
+      case 'medium':
+        return '#f59e0b';
+      case 'low':
+        return '#10b981';
+      default:
+        return '#6b7280';
     }
   };
 
@@ -214,6 +247,15 @@ export default function ProfileScreen() {
                 Replace
               </Button>
             </View>
+            <Button
+              mode="contained"
+              onPress={handleOptimizeResume}
+              style={styles.optimizeButton}
+              icon="auto-fix"
+              loading={resumeOptimize.isRunning}
+            >
+              {resumeOptimize.isRunning ? 'Analyzing...' : 'Optimize Resume'}
+            </Button>
           </>
         ) : (
           <View style={styles.noResume}>
@@ -291,6 +333,153 @@ export default function ProfileScreen() {
       <Text variant="bodySmall" style={styles.version}>
         JobSeeker AI v1.0.0
       </Text>
+
+      {/* Resume Optimizer Modal */}
+      <Portal>
+        <Modal
+          visible={optimizeModalVisible}
+          onDismiss={() => {
+            setOptimizeModalVisible(false);
+            resumeOptimize.reset();
+          }}
+          contentContainerStyle={styles.optimizeModalContent}
+        >
+          <View style={styles.optimizeModalHeader}>
+            <Text variant="titleLarge" style={styles.optimizeModalTitle}>
+              Resume Analysis
+            </Text>
+            <TouchableOpacity
+              onPress={() => {
+                setOptimizeModalVisible(false);
+                resumeOptimize.reset();
+              }}
+            >
+              <Ionicons name="close" size={24} color="#6b7280" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Loading State */}
+          {resumeOptimize.isRunning && (
+            <View style={styles.optimizeLoading}>
+              <ActivityIndicator size="large" color="#3b82f6" />
+              <Text variant="bodyMedium" style={styles.optimizeLoadingText}>
+                {resumeOptimize.currentStep || 'Analyzing your resume...'}
+              </Text>
+              <ProgressBar
+                progress={resumeOptimize.progress / 100}
+                color="#3b82f6"
+                style={styles.optimizeProgress}
+              />
+            </View>
+          )}
+
+          {/* Error State */}
+          {resumeOptimize.isFailed && (
+            <View style={styles.optimizeError}>
+              <Ionicons name="alert-circle" size={48} color="#dc2626" />
+              <Text variant="bodyMedium" style={styles.optimizeErrorText}>
+                {resumeOptimize.errors[0] || 'Failed to analyze resume'}
+              </Text>
+              <Button mode="outlined" onPress={() => resumeOptimize.run({})}>
+                Try Again
+              </Button>
+            </View>
+          )}
+
+          {/* Results */}
+          {resumeOptimize.isCompleted && resumeOptimize.result && (
+            <ScrollView style={styles.optimizeResults}>
+              {/* ATS Score */}
+              <View style={styles.atsScoreContainer}>
+                <View style={styles.atsScoreCircle}>
+                  <Text variant="headlineLarge" style={styles.atsScoreText}>
+                    {resumeOptimize.result.ats_score}
+                  </Text>
+                  <Text variant="bodySmall" style={styles.atsScoreLabel}>
+                    ATS Score
+                  </Text>
+                </View>
+                <Text variant="bodyMedium" style={styles.atsScoreDescription}>
+                  {resumeOptimize.result.ats_score >= 80
+                    ? 'Great! Your resume is well-optimized for ATS systems.'
+                    : resumeOptimize.result.ats_score >= 60
+                    ? 'Good, but there is room for improvement.'
+                    : 'Your resume needs optimization for better ATS compatibility.'}
+                </Text>
+              </View>
+
+              {/* Suggestions */}
+              {resumeOptimize.result.suggestions && resumeOptimize.result.suggestions.length > 0 && (
+                <View style={styles.suggestionsContainer}>
+                  <Text variant="titleMedium" style={styles.sectionTitle}>
+                    Suggestions
+                  </Text>
+                  {resumeOptimize.result.suggestions.map((suggestion: ResumeOptimizeSuggestion, index: number) => (
+                    <View key={index} style={styles.suggestionItem}>
+                      <View style={styles.suggestionHeader}>
+                        <Chip
+                          style={[
+                            styles.priorityChip,
+                            { backgroundColor: getSuggestionPriorityColor(suggestion.priority) + '20' },
+                          ]}
+                          textStyle={[
+                            styles.priorityChipText,
+                            { color: getSuggestionPriorityColor(suggestion.priority) },
+                          ]}
+                        >
+                          {suggestion.priority}
+                        </Chip>
+                        <Text variant="bodySmall" style={styles.suggestionSection}>
+                          {suggestion.category}
+                        </Text>
+                      </View>
+                      <Text variant="bodyMedium" style={styles.suggestionIssue}>
+                        {suggestion.issue}
+                      </Text>
+                      <Text variant="bodySmall" style={styles.suggestionFix}>
+                        💡 {suggestion.fix}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {/* Keywords */}
+              <View style={styles.keywordsContainer}>
+                {resumeOptimize.result.keywords_missing && resumeOptimize.result.keywords_missing.length > 0 && (
+                  <View style={styles.keywordSection}>
+                    <Text variant="titleSmall" style={styles.keywordTitle}>
+                      Missing Keywords
+                    </Text>
+                    <View style={styles.keywordChips}>
+                      {resumeOptimize.result.keywords_missing.map((keyword: string, index: number) => (
+                        <Chip key={index} style={styles.missingKeywordChip} textStyle={styles.missingKeywordText}>
+                          {keyword}
+                        </Chip>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {resumeOptimize.result.keywords_present && resumeOptimize.result.keywords_present.length > 0 && (
+                  <View style={styles.keywordSection}>
+                    <Text variant="titleSmall" style={styles.keywordTitle}>
+                      Present Keywords
+                    </Text>
+                    <View style={styles.keywordChips}>
+                      {resumeOptimize.result.keywords_present.map((keyword: string, index: number) => (
+                        <Chip key={index} style={styles.presentKeywordChip} textStyle={styles.presentKeywordText}>
+                          {keyword}
+                        </Chip>
+                      ))}
+                    </View>
+                  </View>
+                )}
+              </View>
+            </ScrollView>
+          )}
+        </Modal>
+      </Portal>
     </ScrollView>
   );
 }
@@ -357,5 +546,154 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#9ca3af',
     marginBottom: 32,
+  },
+  // Resume Optimizer styles
+  optimizeButton: {
+    marginHorizontal: 12,
+    marginBottom: 12,
+    backgroundColor: '#3b82f6',
+  },
+  optimizeModalContent: {
+    backgroundColor: '#fff',
+    margin: 16,
+    borderRadius: 12,
+    maxHeight: '85%',
+  },
+  optimizeModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  optimizeModalTitle: {
+    color: '#111827',
+    fontWeight: '600',
+  },
+  optimizeLoading: {
+    padding: 32,
+    alignItems: 'center',
+  },
+  optimizeLoadingText: {
+    color: '#6b7280',
+    marginTop: 16,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  optimizeProgress: {
+    width: '100%',
+    height: 4,
+    borderRadius: 2,
+  },
+  optimizeError: {
+    padding: 32,
+    alignItems: 'center',
+  },
+  optimizeErrorText: {
+    color: '#dc2626',
+    marginVertical: 16,
+    textAlign: 'center',
+  },
+  optimizeResults: {
+    padding: 16,
+  },
+  atsScoreContainer: {
+    alignItems: 'center',
+    marginBottom: 24,
+    paddingBottom: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  atsScoreCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#dbeafe',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  atsScoreText: {
+    color: '#1d4ed8',
+    fontWeight: '700',
+  },
+  atsScoreLabel: {
+    color: '#3b82f6',
+    marginTop: -4,
+  },
+  atsScoreDescription: {
+    color: '#6b7280',
+    textAlign: 'center',
+  },
+  suggestionsContainer: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    color: '#111827',
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  suggestionItem: {
+    backgroundColor: '#f9fafb',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  suggestionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  priorityChip: {
+    height: 24,
+    marginRight: 8,
+  },
+  priorityChipText: {
+    fontSize: 11,
+    textTransform: 'capitalize',
+  },
+  suggestionSection: {
+    color: '#6b7280',
+    textTransform: 'capitalize',
+  },
+  suggestionIssue: {
+    color: '#374151',
+    marginBottom: 4,
+  },
+  suggestionFix: {
+    color: '#059669',
+    fontStyle: 'italic',
+  },
+  keywordsContainer: {
+    marginBottom: 16,
+  },
+  keywordSection: {
+    marginBottom: 16,
+  },
+  keywordTitle: {
+    color: '#374151',
+    marginBottom: 8,
+  },
+  keywordChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  missingKeywordChip: {
+    backgroundColor: '#fef2f2',
+    marginBottom: 4,
+  },
+  missingKeywordText: {
+    color: '#dc2626',
+    fontSize: 12,
+  },
+  presentKeywordChip: {
+    backgroundColor: '#dcfce7',
+    marginBottom: 4,
+  },
+  presentKeywordText: {
+    color: '#166534',
+    fontSize: 12,
   },
 });

@@ -194,6 +194,160 @@ export const SUBSCRIPTION_ENDPOINTS = {
   },
 } satisfies Record<string, EndpointConfig>;
 
+// ============= Agent Endpoints =============
+export const AGENT_ENDPOINTS = {
+  // Job Radar
+  radarRun: {
+    path: '/agent/radar/run',
+    method: 'POST' as const,
+    requiresAuth: true,
+  },
+  radarStatus: {
+    path: '/agent/radar/status/:runId',
+    method: 'GET' as const,
+    requiresAuth: true,
+  },
+  radarResult: {
+    path: '/agent/radar/result/:runId',
+    method: 'GET' as const,
+    requiresAuth: true,
+  },
+  // Cover Letter
+  coverLetterRun: {
+    path: '/agent/cover-letter/generate',
+    method: 'POST' as const,
+    requiresAuth: true,
+  },
+  coverLetterStatus: {
+    path: '/agent/cover-letter/status/:runId',
+    method: 'GET' as const,
+    requiresAuth: true,
+  },
+  coverLetterResult: {
+    path: '/agent/cover-letter/result/:runId',
+    method: 'GET' as const,
+    requiresAuth: true,
+  },
+  // Resume Optimizer
+  resumeOptimizeRun: {
+    path: '/agent/resume/optimize',
+    method: 'POST' as const,
+    requiresAuth: true,
+  },
+  resumeOptimizeStatus: {
+    path: '/agent/resume/status/:runId',
+    method: 'GET' as const,
+    requiresAuth: true,
+  },
+  resumeOptimizeResult: {
+    path: '/agent/resume/result/:runId',
+    method: 'GET' as const,
+    requiresAuth: true,
+  },
+  // Interview Prep
+  interviewPrepRun: {
+    path: '/agent/interview/prep',
+    method: 'POST' as const,
+    requiresAuth: true,
+  },
+  interviewPrepStatus: {
+    path: '/agent/interview/status/:runId',
+    method: 'GET' as const,
+    requiresAuth: true,
+  },
+  interviewPrepResult: {
+    path: '/agent/interview/result/:runId',
+    method: 'GET' as const,
+    requiresAuth: true,
+  },
+  // Salary Research
+  salaryResearchRun: {
+    path: '/agent/salary/research',
+    method: 'POST' as const,
+    requiresAuth: true,
+  },
+  salaryResearchStatus: {
+    path: '/agent/salary/status/:runId',
+    method: 'GET' as const,
+    requiresAuth: true,
+  },
+  salaryResearchResult: {
+    path: '/agent/salary/result/:runId',
+    method: 'GET' as const,
+    requiresAuth: true,
+  },
+  // Skill Gap
+  skillGapRun: {
+    path: '/agent/skill-gap/analyze',
+    method: 'POST' as const,
+    requiresAuth: true,
+  },
+  skillGapStatus: {
+    path: '/agent/skill-gap/status/:runId',
+    method: 'GET' as const,
+    requiresAuth: true,
+  },
+  skillGapResult: {
+    path: '/agent/skill-gap/result/:runId',
+    method: 'GET' as const,
+    requiresAuth: true,
+  },
+  // Application Tracker
+  trackerRun: {
+    path: '/agent/tracker/briefing',
+    method: 'POST' as const,
+    requiresAuth: true,
+  },
+  trackerStatus: {
+    path: '/agent/tracker/status/:runId',
+    method: 'GET' as const,
+    requiresAuth: true,
+  },
+  trackerResult: {
+    path: '/agent/tracker/result/:runId',
+    method: 'GET' as const,
+    requiresAuth: true,
+  },
+  // Network Intelligence
+  networkRun: {
+    path: '/agent/network/analyze',
+    method: 'POST' as const,
+    requiresAuth: true,
+  },
+  networkStatus: {
+    path: '/agent/network/status/:runId',
+    method: 'GET' as const,
+    requiresAuth: true,
+  },
+  networkResult: {
+    path: '/agent/network/result/:runId',
+    method: 'GET' as const,
+    requiresAuth: true,
+  },
+  // Auto-Apply
+  autoApplyRun: {
+    path: '/agent/apply/prepare',
+    method: 'POST' as const,
+    requiresAuth: true,
+  },
+  autoApplyStatus: {
+    path: '/agent/apply/status/:runId',
+    method: 'GET' as const,
+    requiresAuth: true,
+  },
+  autoApplyResult: {
+    path: '/agent/apply/result/:runId',
+    method: 'GET' as const,
+    requiresAuth: true,
+  },
+  // Health check
+  health: {
+    path: '/agent/health',
+    method: 'GET' as const,
+    requiresAuth: false,
+  },
+} satisfies Record<string, EndpointConfig>;
+
 // ============= All Endpoints =============
 export const API_ENDPOINTS = {
   auth: AUTH_ENDPOINTS,
@@ -203,6 +357,7 @@ export const API_ENDPOINTS = {
   resume: RESUME_ENDPOINTS,
   proposals: PROPOSAL_ENDPOINTS,
   subscription: SUBSCRIPTION_ENDPOINTS,
+  agent: AGENT_ENDPOINTS,
 } as const;
 
 /**

@@ -1,22 +1,29 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   FlatList,
   StyleSheet,
   RefreshControl,
   ActivityIndicator,
+  TouchableOpacity,
+  ScrollView,
 } from 'react-native';
-import { Text, Chip, SegmentedButtons } from 'react-native-paper';
+import { Text, Chip, SegmentedButtons, Button, Portal, Modal, ProgressBar } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { useMatchesInfinite } from '../../src/hooks/useJobs';
+import { useApplicationTracker } from '../../src/hooks/useAgent';
 import JobCard from '../../src/components/JobCard';
-import type { JobMatch } from '@jobseeker/shared';
+import type { JobMatch, ApplicationActionItem } from '@jobseeker/shared';
 
 type StatusFilter = 'all' | 'saved' | 'applied' | 'interviewing';
 
 export default function MatchesScreen() {
   const router = useRouter();
   const [statusFilter, setStatusFilter] = React.useState<StatusFilter>('all');
+  const [briefingModalVisible, setBriefingModalVisible] = useState(false);
+
+  // Application Tracker agent for briefings
+  const applicationTracker = useApplicationTracker();
 
   const {
     data,
@@ -50,6 +57,35 @@ export default function MatchesScreen() {
     },
     [router]
   );
+
+  // Run Application Tracker briefing
+  const handleGetBriefing = useCallback(() => {
+    setBriefingModalVisible(true);
+    applicationTracker.run({});
+  }, [applicationTracker]);
+
+  // Navigate to job from action item
+  const handleActionItemPress = useCallback(
+    (item: ApplicationActionItem) => {
+      setBriefingModalVisible(false);
+      router.push(`/job/${item.job_id}`);
+    },
+    [router]
+  );
+
+  // Get color based on priority
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'high':
+        return '#dc2626';
+      case 'medium':
+        return '#f59e0b';
+      case 'low':
+        return '#10b981';
+      default:
+        return '#6b7280';
+    }
+  };
 
   const loadMore = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) {
@@ -138,17 +174,49 @@ export default function MatchesScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <SegmentedButtons
-          value={statusFilter}
-          onValueChange={(value) => setStatusFilter(value as StatusFilter)}
-          buttons={[
-            { value: 'all', label: 'All' },
-            { value: 'saved', label: 'Saved' },
-            { value: 'applied', label: 'Applied' },
-            { value: 'interviewing', label: 'Interview' },
-          ]}
-          style={styles.segmentedButtons}
-        />
+        <View style={styles.headerRow}>
+          <SegmentedButtons
+            value={statusFilter}
+            onValueChange={(value) => setStatusFilter(value as StatusFilter)}
+            buttons={[
+              { value: 'all', label: 'All' },
+              { value: 'saved', label: 'Saved' },
+              { value: 'applied', label: 'Applied' },
+              { value: 'interviewing', label: 'Interview' },
+            ]}
+            style={styles.segmentedButtons}
+          />
+          <Button
+            mode="contained"
+            onPress={handleGetBriefing}
+            disabled={applicationTracker.isRunning}
+            style={styles.briefingButton}
+            labelStyle={styles.briefingButtonLabel}
+            icon="clipboard-text"
+            compact
+          >
+            {applicationTracker.isRunning ? 'Loading...' : 'Briefing'}
+          </Button>
+        </View>
+
+        {/* Briefing Progress Banner */}
+        {applicationTracker.isRunning && (
+          <View style={styles.briefingBanner}>
+            <View style={styles.briefingBannerContent}>
+              <ActivityIndicator size="small" color="#3b82f6" />
+              <View style={styles.briefingBannerText}>
+                <Text variant="bodySmall" style={styles.briefingStep}>
+                  {applicationTracker.currentStep || 'Analyzing your applications...'}
+                </Text>
+              </View>
+            </View>
+            <ProgressBar
+              progress={applicationTracker.progress / 100}
+              color="#3b82f6"
+              style={styles.briefingProgress}
+            />
+          </View>
+        )}
       </View>
 
       {isLoading ? (
@@ -176,6 +244,170 @@ export default function MatchesScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
+
+      {/* Application Tracker Briefing Modal */}
+      <Portal>
+        <Modal
+          visible={briefingModalVisible}
+          onDismiss={() => setBriefingModalVisible(false)}
+          contentContainerStyle={styles.modalContent}
+        >
+          <View style={styles.modalHeader}>
+            <Text variant="titleLarge" style={styles.modalTitle}>
+              Application Briefing
+            </Text>
+            <TouchableOpacity onPress={() => setBriefingModalVisible(false)}>
+              <Text style={styles.modalClose}>✕</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.modalScroll}>
+            {/* Loading State */}
+            {applicationTracker.isRunning && (
+              <View style={styles.modalLoadingContainer}>
+                <ActivityIndicator size="large" color="#3b82f6" />
+                <Text variant="bodyMedium" style={styles.modalLoadingText}>
+                  {applicationTracker.currentStep || 'Analyzing your applications...'}
+                </Text>
+                <ProgressBar
+                  progress={applicationTracker.progress / 100}
+                  color="#3b82f6"
+                  style={styles.modalProgressBar}
+                />
+              </View>
+            )}
+
+            {/* Error State */}
+            {applicationTracker.isFailed && (
+              <View style={styles.modalErrorContainer}>
+                <Text variant="bodyLarge" style={styles.modalErrorTitle}>
+                  Analysis Failed
+                </Text>
+                <Text variant="bodySmall" style={styles.modalErrorText}>
+                  {applicationTracker.errors[0] || 'Unknown error occurred'}
+                </Text>
+                <Button
+                  mode="contained"
+                  onPress={() => applicationTracker.run({})}
+                  style={styles.retryButton}
+                >
+                  Try Again
+                </Button>
+              </View>
+            )}
+
+            {/* Results State */}
+            {applicationTracker.isCompleted && applicationTracker.result && (
+              <>
+                {/* Summary Stats */}
+                <View style={styles.summarySection}>
+                  <Text variant="titleMedium" style={styles.sectionTitle}>
+                    Summary
+                  </Text>
+                  <View style={styles.statsGrid}>
+                    <View style={styles.statCard}>
+                      <Text variant="headlineMedium" style={styles.statNumber}>
+                        {applicationTracker.result.summary?.total_applications ?? 0}
+                      </Text>
+                      <Text variant="bodySmall" style={styles.statLabel}>
+                        Total
+                      </Text>
+                    </View>
+                    <View style={styles.statCard}>
+                      <Text variant="headlineMedium" style={[styles.statNumber, { color: '#f59e0b' }]}>
+                        {applicationTracker.result.summary?.pending_response ?? 0}
+                      </Text>
+                      <Text variant="bodySmall" style={styles.statLabel}>
+                        Pending
+                      </Text>
+                    </View>
+                    <View style={styles.statCard}>
+                      <Text variant="headlineMedium" style={[styles.statNumber, { color: '#10b981' }]}>
+                        {applicationTracker.result.summary?.interviews_scheduled ?? 0}
+                      </Text>
+                      <Text variant="bodySmall" style={styles.statLabel}>
+                        Interviews
+                      </Text>
+                    </View>
+                    <View style={styles.statCard}>
+                      <Text variant="headlineMedium" style={[styles.statNumber, { color: '#dc2626' }]}>
+                        {applicationTracker.result.summary?.needs_followup ?? 0}
+                      </Text>
+                      <Text variant="bodySmall" style={styles.statLabel}>
+                        Follow-up
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Action Items */}
+                {applicationTracker.result.action_items.length > 0 && (
+                  <View style={styles.actionItemsSection}>
+                    <Text variant="titleMedium" style={styles.sectionTitle}>
+                      Action Items
+                    </Text>
+                    {applicationTracker.result.action_items.map((item, index) => (
+                      <TouchableOpacity
+                        key={`${item.job_id}-${index}`}
+                        style={styles.actionItem}
+                        onPress={() => handleActionItemPress(item)}
+                      >
+                        <View style={styles.actionItemContent}>
+                          <View style={styles.actionItemHeader}>
+                            <Chip
+                              style={[
+                                styles.priorityChip,
+                                { backgroundColor: `${getPriorityColor(item.priority)}20` },
+                              ]}
+                              textStyle={[
+                                styles.priorityChipText,
+                                { color: getPriorityColor(item.priority) },
+                              ]}
+                            >
+                              {item.priority}
+                            </Chip>
+                            {item.due_date && (
+                              <Text variant="bodySmall" style={styles.dueDate}>
+                                Due: {new Date(item.due_date).toLocaleDateString()}
+                              </Text>
+                            )}
+                          </View>
+                          <Text variant="bodyMedium" style={styles.actionItemTitle}>
+                            {item.job_title}
+                          </Text>
+                          <Text variant="bodySmall" style={styles.actionItemCompany}>
+                            {item.company}
+                          </Text>
+                          <Text variant="bodySmall" style={styles.actionItemAction}>
+                            {item.action}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+
+                {/* Insights */}
+                {applicationTracker.result.insights.length > 0 && (
+                  <View style={styles.insightsSection}>
+                    <Text variant="titleMedium" style={styles.sectionTitle}>
+                      Insights
+                    </Text>
+                    {applicationTracker.result.insights.map((insight, index) => (
+                      <View key={index} style={styles.insightItem}>
+                        <Text style={styles.insightBullet}>•</Text>
+                        <Text variant="bodySmall" style={styles.insightText}>
+                          {insight}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </>
+            )}
+          </ScrollView>
+        </Modal>
+      </Portal>
     </View>
   );
 }
@@ -231,8 +463,42 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   segmentedButtons: {
+    flex: 1,
     backgroundColor: '#f3f4f6',
+  },
+  briefingButton: {
+    backgroundColor: '#3b82f6',
+  },
+  briefingButtonLabel: {
+    fontSize: 12,
+  },
+  briefingBanner: {
+    marginTop: 8,
+    backgroundColor: '#eff6ff',
+    borderRadius: 8,
+    padding: 12,
+  },
+  briefingBannerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  briefingBannerText: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  briefingStep: {
+    color: '#1e40af',
+  },
+  briefingProgress: {
+    marginTop: 8,
+    height: 4,
+    borderRadius: 2,
   },
   listContent: {
     padding: 16,
@@ -321,5 +587,157 @@ const styles = StyleSheet.create({
   retryLink: {
     color: '#3b82f6',
     fontWeight: '600',
+  },
+  // Modal styles
+  modalContent: {
+    backgroundColor: '#fff',
+    margin: 20,
+    borderRadius: 12,
+    maxHeight: '85%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  modalTitle: {
+    color: '#111827',
+  },
+  modalClose: {
+    fontSize: 24,
+    color: '#6b7280',
+    padding: 4,
+  },
+  modalScroll: {
+    maxHeight: 500,
+  },
+  modalLoadingContainer: {
+    padding: 32,
+    alignItems: 'center',
+  },
+  modalLoadingText: {
+    color: '#6b7280',
+    marginTop: 16,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  modalProgressBar: {
+    width: '100%',
+    height: 4,
+    borderRadius: 2,
+  },
+  modalErrorContainer: {
+    padding: 32,
+    alignItems: 'center',
+  },
+  modalErrorTitle: {
+    color: '#dc2626',
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  modalErrorText: {
+    color: '#6b7280',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  retryButton: {
+    backgroundColor: '#3b82f6',
+  },
+  // Summary section
+  summarySection: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  sectionTitle: {
+    color: '#111827',
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  statCard: {
+    width: '48%',
+    backgroundColor: '#f9fafb',
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  statNumber: {
+    color: '#3b82f6',
+    fontWeight: '700',
+  },
+  statLabel: {
+    color: '#6b7280',
+    marginTop: 4,
+  },
+  // Action items section
+  actionItemsSection: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  actionItem: {
+    backgroundColor: '#f9fafb',
+    borderRadius: 8,
+    marginBottom: 8,
+    overflow: 'hidden',
+  },
+  actionItemContent: {
+    padding: 12,
+  },
+  actionItemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  priorityChip: {
+    height: 24,
+  },
+  priorityChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'capitalize',
+  },
+  dueDate: {
+    color: '#6b7280',
+  },
+  actionItemTitle: {
+    color: '#111827',
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  actionItemCompany: {
+    color: '#6b7280',
+    marginBottom: 4,
+  },
+  actionItemAction: {
+    color: '#374151',
+    fontStyle: 'italic',
+  },
+  // Insights section
+  insightsSection: {
+    padding: 16,
+  },
+  insightItem: {
+    flexDirection: 'row',
+    marginBottom: 8,
+  },
+  insightBullet: {
+    color: '#3b82f6',
+    marginRight: 8,
+    fontSize: 16,
+  },
+  insightText: {
+    color: '#374151',
+    flex: 1,
   },
 });
