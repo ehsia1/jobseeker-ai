@@ -1,9 +1,14 @@
 """Main FastAPI application."""
 
+import traceback
+import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+
+logger = logging.getLogger(__name__)
 
 try:
     import sentry_sdk
@@ -67,6 +72,20 @@ if settings.environment == "production":
         TrustedHostMiddleware,
         allowed_hosts=["*"]  # Configure with actual domains in production
     )
+
+
+# Add exception handler for debugging
+@app.exception_handler(Exception)
+async def debug_exception_handler(request: Request, exc: Exception):
+    """Debug exception handler that logs full tracebacks."""
+    tb = traceback.format_exc()
+    logger.error(f"Unhandled exception in {request.url}: {exc}\n{tb}")
+    print(f"ERROR: {exc}\n{tb}")  # Also print to console
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc), "traceback": tb.split('\n')}
+    )
+
 
 # Include routers
 app.include_router(health.router, prefix="/health", tags=["Health"])
