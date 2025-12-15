@@ -319,6 +319,60 @@ async def delete_resume(
     return None
 
 
+@router.post("/reparse", response_model=ResumeUploadResponse)
+async def reparse_resume(
+    current_user: User = Depends(get_current_user_or_demo),
+    db: AsyncSession = Depends(get_db),
+):
+    """Re-parse the current user's resume using updated parsing logic.
+
+    This re-processes the stored resume text without requiring a new upload.
+    Useful when parsing logic has been improved to get better extraction results.
+    """
+    service = ResumeService(db)
+    resume = await service.get_resume(current_user.id)
+
+    if resume is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No resume found to re-parse",
+        )
+
+    if not resume.raw_text or len(resume.raw_text.strip()) < 50:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Resume has no stored text content to re-parse. Please upload again.",
+        )
+
+    try:
+        # Re-parse the stored text
+        reparsed = await service.parse_text(
+            user_id=current_user.id,
+            text=resume.raw_text,
+        )
+
+        # Restore file metadata that parse_text clears
+        reparsed.file_name = resume.file_name
+        reparsed.file_type = resume.file_type if resume.file_type != "text" else reparsed.file_type
+        reparsed.file_size = resume.file_size
+
+        await db.commit()
+        await db.refresh(reparsed)
+
+        return ResumeUploadResponse(
+            message="Resume re-parsed successfully with updated logic",
+            resume=_resume_to_response(reparsed),
+        )
+
+    except Exception as e:
+        logger.error(f"Resume reparse failed: {e}")
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to re-parse resume. Please try uploading again.",
+        )
+
+
 @router.get("/summary", response_model=Optional[ResumeSummary])
 async def get_resume_summary(
     current_user: User = Depends(get_current_user_or_demo),
@@ -347,6 +401,42 @@ async def get_resume_summary(
         parsed_at=resume.parsed_at,
         updated_at=resume.updated_at,
     )
+
+
+@router.get("/debug/raw-text")
+async def get_raw_text(
+    current_user: User = Depends(get_current_user_or_demo),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get the raw extracted text from the resume for debugging.
+
+    This shows exactly what text was extracted from your PDF/DOCX file.
+    If this text doesn't match your resume, the file extraction failed.
+    """
+    service = ResumeService(db)
+    resume = await service.get_resume(current_user.id)
+
+    if resume is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No resume found",
+        )
+
+    raw_text = resume.raw_text or ""
+
+    return {
+        "file_name": resume.file_name,
+        "file_type": resume.file_type,
+        "file_size": resume.file_size,
+        "raw_text_length": len(raw_text),
+        "raw_text_preview": raw_text[:2000] if raw_text else None,
+        "raw_text_full": raw_text,
+        "parsed_at": resume.parsed_at.isoformat() if resume.parsed_at else None,
+        "parse_quality_score": resume.parse_quality_score,
+        "extracted_full_name": resume.full_name,
+        "extracted_skills_count": len(resume.skills or []),
+        "extracted_work_exp_count": len(resume.work_experiences or []),
+    }
 
 
 @router.get("/health")

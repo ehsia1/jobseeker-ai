@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
@@ -201,9 +202,11 @@ async def get_current_user_info(
     )
     profile = profile_result.scalar_one_or_none()
 
-    # Get resume summary
+    # Get resume summary with work_experiences eagerly loaded
     resume_result = await db.execute(
-        select(Resume).where(Resume.user_id == user.id)
+        select(Resume)
+        .options(selectinload(Resume.work_experiences))
+        .where(Resume.user_id == user.id)
     )
     resume = resume_result.scalar_one_or_none()
 
@@ -219,6 +222,9 @@ async def get_current_user_info(
             "uploaded_at": resume.parsed_at.isoformat() if resume.parsed_at else resume.created_at.isoformat(),
             "full_name": resume.full_name,
             "skills": resume.skills or [],
+            "parse_quality_score": resume.parse_quality_score,
+            "total_experience_years": resume.total_experience_years,
+            "work_experience_count": len(resume.work_experiences) if resume.work_experiences else 0,
         }
 
     return user_dict

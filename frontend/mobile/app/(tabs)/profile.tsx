@@ -18,19 +18,23 @@ import { useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/contexts/AuthContext';
-import { useProfile, useUpdateProfile } from '../../src/hooks/useJobs';
+import { useProfile, useUpdateProfile, useUploadResume, useReparseResume, useSubmitResumeText } from '../../src/hooks/useJobs';
 import { useResumeOptimizer } from '../../src/hooks/useAgent';
-import { resumeApi } from '../../src/api/client';
 import type { ResumeOptimizeSuggestion } from '@jobseeker/shared';
+import { TextInput as RNTextInput } from 'react-native';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, logout, isLoading, refreshUser } = useAuth();
   const { data: profile, isLoading: isLoadingProfile, refetch: refetchProfile } = useProfile();
   const updateProfile = useUpdateProfile();
+  const uploadResume = useUploadResume();
+  const reparseResume = useReparseResume();
+  const submitResumeText = useSubmitResumeText();
   const [pushNotifications, setPushNotifications] = React.useState(true);
-  const [isUploadingResume, setIsUploadingResume] = React.useState(false);
   const [optimizeModalVisible, setOptimizeModalVisible] = useState(false);
+  const [pasteTextModalVisible, setPasteTextModalVisible] = useState(false);
+  const [resumeText, setResumeText] = useState('');
 
   // Resume Optimizer agent
   const resumeOptimize = useResumeOptimizer();
@@ -84,29 +88,46 @@ export default function ProfileScreen() {
       }
 
       const file = result.assets[0];
-      setIsUploadingResume(true);
 
-      await resumeApi.uploadResume({
+      // Use the mutation hook which handles cache invalidation
+      await uploadResume.mutateAsync({
         uri: file.uri,
         name: file.name,
         type: file.mimeType || 'application/pdf',
       });
 
-      Alert.alert('Success', 'Resume uploaded successfully');
-      refetchProfile();
-      refreshUser();
+      Alert.alert('Success', 'Resume uploaded and parsed successfully! View your resume to see the extracted data.');
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to upload resume');
-    } finally {
-      setIsUploadingResume(false);
+    }
+  };
+
+  const handleReparseResume = async () => {
+    try {
+      await reparseResume.mutateAsync();
+      Alert.alert('Success', 'Resume re-parsed with updated logic! View your resume to see the refreshed data.');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to re-parse resume');
     }
   };
 
   const handleViewResume = () => {
-    if (user?.resume?.url) {
-      Linking.openURL(user.resume.url);
-    } else {
-      Alert.alert('Resume', 'Resume preview not available');
+    router.push('/resume/view');
+  };
+
+  const handleSubmitResumeText = async () => {
+    if (!resumeText.trim() || resumeText.trim().length < 100) {
+      Alert.alert('Error', 'Please paste at least 100 characters of resume content.');
+      return;
+    }
+
+    try {
+      await submitResumeText.mutateAsync(resumeText.trim());
+      setPasteTextModalVisible(false);
+      setResumeText('');
+      Alert.alert('Success', 'Resume text parsed successfully! Your profile has been updated.');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to parse resume text');
     }
   };
 
@@ -234,6 +255,75 @@ export default function ProfileScreen() {
               right={() => <List.Icon icon="chevron-right" />}
               onPress={handleViewResume}
             />
+            {/* Resume Stats */}
+            <View style={styles.resumeStats}>
+              <View style={styles.resumeStat}>
+                <Text variant="titleMedium" style={styles.resumeStatValue}>
+                  {user.resume.work_experience_count ?? 0}
+                </Text>
+                <Text variant="bodySmall" style={styles.resumeStatLabel}>
+                  Jobs
+                </Text>
+              </View>
+              <View style={styles.resumeStat}>
+                <Text variant="titleMedium" style={styles.resumeStatValue}>
+                  {user.resume.total_experience_years ?? 0}
+                </Text>
+                <Text variant="bodySmall" style={styles.resumeStatLabel}>
+                  Years Exp
+                </Text>
+              </View>
+              <View style={styles.resumeStat}>
+                <Text variant="titleMedium" style={[
+                  styles.resumeStatValue,
+                  { color: (user.resume.parse_quality_score ?? 0) >= 70 ? '#10b981' : '#f59e0b' }
+                ]}>
+                  {user.resume.parse_quality_score ?? 0}%
+                </Text>
+                <Text variant="bodySmall" style={styles.resumeStatLabel}>
+                  Parse Quality
+                </Text>
+              </View>
+            </View>
+
+            {/* Low Parse Quality Warning */}
+            {(user.resume.parse_quality_score ?? 0) < 50 && (
+              <View style={styles.parseWarning}>
+                <View style={styles.parseWarningHeader}>
+                  <Ionicons name="warning" size={20} color="#d97706" />
+                  <Text variant="titleSmall" style={styles.parseWarningTitle}>
+                    Low Parse Quality Detected
+                  </Text>
+                </View>
+                <Text variant="bodySmall" style={styles.parseWarningText}>
+                  Your resume may not have extracted correctly. This can happen with complex PDF layouts or image-based resumes.
+                </Text>
+                <Text variant="bodySmall" style={styles.parseWarningSuggestion}>
+                  Try one of these options:
+                </Text>
+                <View style={styles.parseWarningOptions}>
+                  <Text variant="bodySmall" style={styles.parseWarningOption}>
+                    • Paste your resume text directly (most reliable)
+                  </Text>
+                  <Text variant="bodySmall" style={styles.parseWarningOption}>
+                    • Upload a simpler PDF format
+                  </Text>
+                  <Text variant="bodySmall" style={styles.parseWarningOption}>
+                    • Try the Re-parse button after uploading
+                  </Text>
+                </View>
+                <Button
+                  mode="contained"
+                  onPress={() => setPasteTextModalVisible(true)}
+                  style={styles.parseWarningButton}
+                  icon="text-box-outline"
+                  buttonColor="#d97706"
+                >
+                  Paste Resume Text
+                </Button>
+              </View>
+            )}
+
             <Divider />
             <View style={styles.resumeActions}>
               <Button mode="outlined" onPress={handleViewResume} style={styles.resumeButton}>
@@ -243,9 +333,28 @@ export default function ProfileScreen() {
                 mode="outlined"
                 onPress={handleUploadResume}
                 style={styles.resumeButton}
-                loading={isUploadingResume}
+                loading={uploadResume.isPending}
               >
                 Replace
+              </Button>
+              <Button
+                mode="outlined"
+                onPress={handleReparseResume}
+                style={styles.resumeButton}
+                loading={reparseResume.isPending}
+                icon="refresh"
+              >
+                Re-parse
+              </Button>
+            </View>
+            <View style={styles.resumeSecondaryActions}>
+              <Button
+                mode="text"
+                onPress={() => setPasteTextModalVisible(true)}
+                icon="text-box-outline"
+                compact
+              >
+                Paste Text Instead
               </Button>
             </View>
             <Button
@@ -267,7 +376,7 @@ export default function ProfileScreen() {
               mode="contained"
               onPress={handleUploadResume}
               icon="upload"
-              loading={isUploadingResume}
+              loading={uploadResume.isPending}
             >
               Upload Resume
             </Button>
@@ -480,6 +589,78 @@ export default function ProfileScreen() {
             </ScrollView>
           )}
         </Modal>
+
+        {/* Paste Resume Text Modal */}
+        <Modal
+          visible={pasteTextModalVisible}
+          onDismiss={() => {
+            setPasteTextModalVisible(false);
+            setResumeText('');
+          }}
+          contentContainerStyle={styles.pasteTextModalContent}
+        >
+          <View style={styles.pasteTextModalHeader}>
+            <Text variant="titleLarge" style={styles.pasteTextModalTitle}>
+              Paste Resume Text
+            </Text>
+            <TouchableOpacity
+              onPress={() => {
+                setPasteTextModalVisible(false);
+                setResumeText('');
+              }}
+            >
+              <Ionicons name="close" size={24} color="#6b7280" />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.pasteTextInstructions}>
+            <Ionicons name="information-circle-outline" size={20} color="#3b82f6" />
+            <Text variant="bodySmall" style={styles.pasteTextInstructionsText}>
+              Copy your resume content from Word, Google Docs, or any text editor and paste it below. This bypasses PDF extraction issues.
+            </Text>
+          </View>
+
+          <RNTextInput
+            style={styles.pasteTextInput}
+            multiline
+            placeholder="Paste your resume text here...&#10;&#10;Include your contact info, work experience, education, skills, etc."
+            placeholderTextColor="#9ca3af"
+            value={resumeText}
+            onChangeText={setResumeText}
+            textAlignVertical="top"
+          />
+
+          <View style={styles.pasteTextCharCount}>
+            <Text variant="bodySmall" style={[
+              styles.pasteTextCharCountText,
+              { color: resumeText.length >= 100 ? '#10b981' : '#f59e0b' }
+            ]}>
+              {resumeText.length} characters {resumeText.length < 100 ? '(minimum 100)' : ''}
+            </Text>
+          </View>
+
+          <View style={styles.pasteTextActions}>
+            <Button
+              mode="outlined"
+              onPress={() => {
+                setPasteTextModalVisible(false);
+                setResumeText('');
+              }}
+              style={styles.pasteTextCancelButton}
+            >
+              Cancel
+            </Button>
+            <Button
+              mode="contained"
+              onPress={handleSubmitResumeText}
+              style={styles.pasteTextSubmitButton}
+              loading={submitResumeText.isPending}
+              disabled={resumeText.trim().length < 100}
+            >
+              Parse Resume
+            </Button>
+          </View>
+        </Modal>
       </Portal>
     </ScrollView>
   );
@@ -537,6 +718,23 @@ const styles = StyleSheet.create({
   },
   resumeButton: {
     flex: 1,
+  },
+  resumeStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  resumeStat: {
+    alignItems: 'center',
+  },
+  resumeStatValue: {
+    fontWeight: '600',
+    color: '#111827',
+  },
+  resumeStatLabel: {
+    color: '#6b7280',
+    marginTop: 2,
   },
   logoutButton: {
     margin: 16,
@@ -696,5 +894,117 @@ const styles = StyleSheet.create({
   presentKeywordText: {
     color: '#166534',
     fontSize: 12,
+  },
+  // Parse warning styles
+  parseWarning: {
+    backgroundColor: '#fffbeb',
+    padding: 12,
+    marginHorizontal: 12,
+    marginVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#fcd34d',
+  },
+  parseWarningHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  parseWarningTitle: {
+    color: '#92400e',
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  parseWarningText: {
+    color: '#78350f',
+    marginBottom: 8,
+    lineHeight: 18,
+  },
+  parseWarningSuggestion: {
+    color: '#92400e',
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  parseWarningOptions: {
+    marginBottom: 12,
+  },
+  parseWarningOption: {
+    color: '#78350f',
+    marginLeft: 8,
+    lineHeight: 20,
+  },
+  parseWarningButton: {
+    marginTop: 4,
+  },
+  // Resume secondary actions
+  resumeSecondaryActions: {
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  // Paste text modal styles
+  pasteTextModalContent: {
+    backgroundColor: '#fff',
+    margin: 16,
+    borderRadius: 12,
+    maxHeight: '85%',
+  },
+  pasteTextModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  pasteTextModalTitle: {
+    color: '#111827',
+    fontWeight: '600',
+  },
+  pasteTextInstructions: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: 12,
+    backgroundColor: '#eff6ff',
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 8,
+    gap: 8,
+  },
+  pasteTextInstructionsText: {
+    color: '#1e40af',
+    flex: 1,
+    lineHeight: 18,
+  },
+  pasteTextInput: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    height: 200,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    color: '#111827',
+    backgroundColor: '#f9fafb',
+  },
+  pasteTextCharCount: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    alignItems: 'flex-end',
+  },
+  pasteTextCharCountText: {
+    fontSize: 12,
+  },
+  pasteTextActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    padding: 16,
+    gap: 12,
+  },
+  pasteTextCancelButton: {
+    minWidth: 80,
+  },
+  pasteTextSubmitButton: {
+    minWidth: 120,
   },
 });

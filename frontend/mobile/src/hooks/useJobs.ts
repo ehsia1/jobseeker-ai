@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { jobsApi, matchesApi, profileApi } from '../api/client';
-import type { SearchQuery, JobMatchStatus, UserProfile } from '../../shared/src/types';
+import type { SearchQuery, JobMatchStatus, UserProfile, Resume } from '@jobseeker/shared';
 import { useAuth } from '../contexts/AuthContext';
 
 // Fetch jobs with infinite scroll
@@ -8,14 +8,10 @@ export function useJobsInfinite(options?: { remote_only?: boolean; size?: number
   const size = options?.size ?? 20;
   const { isAuthenticated, isLoading } = useAuth();
 
-  console.log('[useJobsInfinite] isAuthenticated:', isAuthenticated, 'isLoading:', isLoading);
-
   return useInfiniteQuery({
     queryKey: ['jobs', 'infinite', options?.remote_only],
     queryFn: async ({ pageParam = 1 }) => {
-      console.log('[useJobsInfinite] queryFn called, page:', pageParam);
       const result = await jobsApi.getJobs(pageParam, size);
-      console.log('[useJobsInfinite] got', result.items.length, 'jobs');
       // Transform to match expected format (items -> jobs)
       return {
         jobs: result.items,
@@ -157,5 +153,105 @@ export function useUpdateProfile() {
       queryClient.invalidateQueries({ queryKey: ['profile'] });
       queryClient.invalidateQueries({ queryKey: ['auth'] });
     },
+  });
+}
+
+// ============= Resume Hooks =============
+import { resumeApi } from '../api/client';
+
+// Fetch current user's resume
+export function useResume() {
+  const { isAuthenticated } = useAuth();
+
+  return useQuery({
+    queryKey: ['resume'],
+    queryFn: () => resumeApi.getResume(),
+    enabled: isAuthenticated,
+    staleTime: 0, // Always fetch fresh data for resume
+  });
+}
+
+// Upload resume with full cache invalidation
+export function useUploadResume() {
+  const queryClient = useQueryClient();
+  const { refreshUser } = useAuth();
+
+  return useMutation({
+    mutationFn: async (file: { uri: string; name: string; type: string }) => {
+      return resumeApi.uploadResume(file);
+    },
+    onSuccess: async () => {
+      // Force invalidate ALL resume-related caches
+      await queryClient.invalidateQueries({ queryKey: ['resume'] });
+      await queryClient.invalidateQueries({ queryKey: ['profile'] });
+      await queryClient.invalidateQueries({ queryKey: ['auth'] });
+
+      // Also reset the queries to force fresh fetch
+      queryClient.resetQueries({ queryKey: ['resume'] });
+
+      // Refresh the user object in AuthContext
+      await refreshUser();
+    },
+  });
+}
+
+// Re-parse existing resume with updated parsing logic
+export function useReparseResume() {
+  const queryClient = useQueryClient();
+  const { refreshUser } = useAuth();
+
+  return useMutation({
+    mutationFn: async () => {
+      return resumeApi.reparseResume();
+    },
+    onSuccess: async () => {
+      // Force invalidate ALL resume-related caches
+      await queryClient.invalidateQueries({ queryKey: ['resume'] });
+      await queryClient.invalidateQueries({ queryKey: ['profile'] });
+      await queryClient.invalidateQueries({ queryKey: ['auth'] });
+
+      // Also reset the queries to force fresh fetch
+      queryClient.resetQueries({ queryKey: ['resume'] });
+
+      // Refresh the user object in AuthContext
+      await refreshUser();
+    },
+  });
+}
+
+// Submit resume as plain text (bypasses PDF extraction issues)
+export function useSubmitResumeText() {
+  const queryClient = useQueryClient();
+  const { refreshUser } = useAuth();
+
+  return useMutation({
+    mutationFn: async (text: string) => {
+      return resumeApi.submitResumeText(text);
+    },
+    onSuccess: async () => {
+      // Force invalidate ALL resume-related caches
+      await queryClient.invalidateQueries({ queryKey: ['resume'] });
+      await queryClient.invalidateQueries({ queryKey: ['resume-debug'] });
+      await queryClient.invalidateQueries({ queryKey: ['profile'] });
+      await queryClient.invalidateQueries({ queryKey: ['auth'] });
+
+      // Also reset the queries to force fresh fetch
+      queryClient.resetQueries({ queryKey: ['resume'] });
+
+      // Refresh the user object in AuthContext
+      await refreshUser();
+    },
+  });
+}
+
+// Get resume debug info (raw text extraction details)
+export function useResumeDebug() {
+  const { isAuthenticated } = useAuth();
+
+  return useQuery({
+    queryKey: ['resume-debug'],
+    queryFn: () => resumeApi.getResumeDebug(),
+    enabled: isAuthenticated,
+    staleTime: 0, // Always fetch fresh
   });
 }

@@ -1,12 +1,155 @@
 """LLM Service - Unified interface for LLM providers (Ollama, OpenAI, Anthropic)."""
 
+import json
 import logging
+import re
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass, field
 
 from backend.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+def repair_json(text: str) -> str:
+    """Attempt to repair common JSON errors from LLM outputs.
+
+    Handles:
+    - Missing commas between elements
+    - Trailing commas before ] or }
+    - Single quotes instead of double quotes
+    - Unquoted string values
+    - Control characters in strings
+    """
+    if not text:
+        return text
+
+    # Remove any leading/trailing whitespace
+    text = text.strip()
+
+    # Remove markdown code blocks
+    if text.startswith("```json"):
+        text = text[7:]
+    if text.startswith("```"):
+        text = text[3:]
+    if text.endswith("```"):
+        text = text[:-3]
+    text = text.strip()
+
+    # Replace single quotes with double quotes (but not within strings)
+    # This is a simplified approach - convert obvious cases
+    text = re.sub(r"'(\w+)':", r'"\1":', text)  # Keys like 'key':
+
+    # Fix missing commas between array elements: "]["  or "}{" or "} {" patterns
+    # Add comma between } and { (objects in array)
+    text = re.sub(r'\}\s*\{', '}, {', text)
+
+    # Add comma between ] and [ (nested arrays)
+    text = re.sub(r'\]\s*\[', '], [', text)
+
+    # Add comma between string and opening brace: "value" {
+    text = re.sub(r'"\s*\{', '", {', text)
+
+    # Add comma between } and "
+    text = re.sub(r'\}\s*"', '}, "', text)
+
+    # Add comma between ] and "
+    text = re.sub(r'\]\s*"', '], "', text)
+
+    # Add comma between number and "
+    text = re.sub(r'(\d)\s*\n\s*"', r'\1,\n"', text)
+
+    # Add comma between true/false/null and "
+    text = re.sub(r'(true|false|null)\s*\n\s*"', r'\1,\n"', text)
+
+    # Missing comma after string value before next key
+    # Pattern: "value"\n    "nextkey":
+    text = re.sub(r'"\s*\n(\s*)"([^"]+)":', r'",\n\1"\2":', text)
+
+    # Missing comma after number before next key
+    text = re.sub(r'(\d)\s*\n(\s*)"([^"]+)":', r'\1,\n\2"\3":', text)
+
+    # Missing comma after closing bracket before next key
+    text = re.sub(r'(\])\s*\n(\s*)"([^"]+)":', r'\1,\n\2"\3":', text)
+
+    # Missing comma after closing brace before next key
+    text = re.sub(r'(\})\s*\n(\s*)"([^"]+)":', r'\1,\n\2"\3":', text)
+
+    # Remove trailing commas before ] or }
+    text = re.sub(r',\s*\]', ']', text)
+    text = re.sub(r',\s*\}', '}', text)
+
+    # Remove control characters that break JSON
+    text = re.sub(r'[\x00-\x1f\x7f-\x9f]', ' ', text)
+
+    return text
+
+
+def try_parse_json(text: str) -> Optional[Dict[str, Any]]:
+    """Try multiple strategies to parse JSON from LLM output."""
+    if not text:
+        return None
+
+    # Strategy 1: Direct parse
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    # Strategy 2: Repair and parse
+    repaired = repair_json(text)
+    try:
+        return json.loads(repaired)
+    except json.JSONDecodeError:
+        pass
+
+    # Strategy 3: Find JSON object in text (LLM may have added explanation)
+    # Look for outermost { } pair
+    brace_start = text.find('{')
+    brace_end = text.rfind('}')
+    if brace_start != -1 and brace_end > brace_start:
+        json_candidate = text[brace_start:brace_end + 1]
+        try:
+            return json.loads(json_candidate)
+        except json.JSONDecodeError:
+            # Try repairing the extracted JSON
+            repaired = repair_json(json_candidate)
+            try:
+                return json.loads(repaired)
+            except json.JSONDecodeError:
+                pass
+
+    # Strategy 4: Try to extract just the first complete JSON object
+    # by counting braces
+    if brace_start != -1:
+        depth = 0
+        in_string = False
+        escape = False
+        for i, char in enumerate(text[brace_start:], brace_start):
+            if escape:
+                escape = False
+                continue
+            if char == '\\':
+                escape = True
+                continue
+            if char == '"':
+                in_string = not in_string
+                continue
+            if in_string:
+                continue
+            if char == '{':
+                depth += 1
+            elif char == '}':
+                depth -= 1
+                if depth == 0:
+                    json_candidate = text[brace_start:i + 1]
+                    repaired = repair_json(json_candidate)
+                    try:
+                        return json.loads(repaired)
+                    except json.JSONDecodeError:
+                        break
+
+    return None
 
 
 @dataclass
@@ -170,10 +313,8 @@ class LLMService:
         Returns:
             Parsed JSON as dictionary.
         """
-        import json
-
         # Add JSON instruction to prompt
-        json_instruction = "\n\nRespond with valid JSON only. No markdown, no explanation."
+        json_instruction = "\n\nIMPORTANT: Respond with valid JSON only. No markdown code blocks, no explanation text before or after. Just the raw JSON object."
         if output_schema:
             json_instruction += f"\n\nExpected schema: {json.dumps(output_schema)}"
 
@@ -181,24 +322,23 @@ class LLMService:
 
         response = await self.generate(full_prompt, system_prompt)
 
-        # Parse JSON from response
-        try:
-            # Try to extract JSON from the response
-            content = response.content.strip()
+        # Parse JSON from response using robust parsing
+        content = response.content.strip()
+        logger.debug(f"Raw LLM response length: {len(content)} chars")
 
-            # Handle markdown code blocks
-            if content.startswith("```json"):
-                content = content[7:]
-            if content.startswith("```"):
-                content = content[3:]
-            if content.endswith("```"):
-                content = content[:-3]
+        # Try robust JSON parsing
+        result = try_parse_json(content)
 
-            return json.loads(content.strip())
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse LLM JSON response: {e}")
-            logger.debug(f"Raw response: {response.content}")
-            raise ValueError(f"LLM did not return valid JSON: {e}")
+        if result is not None:
+            logger.info(f"Successfully parsed JSON with {len(result)} top-level keys")
+            return result
+
+        # If all parsing strategies failed, log details for debugging
+        logger.error(f"Failed to parse LLM JSON response after all repair attempts")
+        logger.error(f"Raw response (first 500 chars): {content[:500]}")
+        logger.error(f"Raw response (last 300 chars): {content[-300:]}")
+
+        raise ValueError(f"LLM did not return valid JSON after repair attempts")
 
     def is_available(self) -> bool:
         """Check if the LLM service is available."""

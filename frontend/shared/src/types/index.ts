@@ -8,6 +8,9 @@ export interface UserResumeSummary {
   uploaded_at: string;
   full_name?: string;
   skills: string[];
+  parse_quality_score?: number;
+  total_experience_years?: number;
+  work_experience_count?: number;
 }
 
 export interface User {

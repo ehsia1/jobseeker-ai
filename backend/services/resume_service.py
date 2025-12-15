@@ -18,6 +18,168 @@ from backend.services.llm_service import get_llm_service, LLMService
 
 logger = logging.getLogger(__name__)
 
+# Placeholder patterns that LLMs commonly generate - these should be rejected
+PLACEHOLDER_PATTERNS = {
+    "emails": [
+        "example.com", "test.com", "email.com", "mail.com", "sample.com",
+        "placeholder", "your-email", "youremail", "user@", "name@",
+    ],
+    "companies": [
+        "techcorp", "acme", "company x", "company y", "company z",
+        "abc corp", "xyz corp", "sample company", "example company",
+        "tech company", "startup x", "corporation", "company name",
+        "previous company", "current company", "your company",
+    ],
+    "names": [
+        "john doe", "jane doe", "john smith", "jane smith",
+        "your name", "full name", "first last", "name here",
+    ],
+}
+
+
+def _is_placeholder(value: Optional[str], category: str) -> bool:
+    """Check if a value appears to be a placeholder."""
+    if not value:
+        return False
+    value_lower = value.lower().strip()
+    patterns = PLACEHOLDER_PATTERNS.get(category, [])
+    for pattern in patterns:
+        if pattern in value_lower:
+            return True
+    return False
+
+
+def _clean_llm_artifacts(value: Optional[str]) -> Optional[str]:
+    """Clean up common LLM artifacts from extracted values.
+
+    LLMs sometimes add prefixes like '#', 'I ', '* ', etc. to values.
+    This function strips those artifacts to get the clean value.
+    """
+    if not value:
+        return value
+
+    original = value
+
+    # Strip whitespace first
+    value = value.strip()
+
+    # Remove common LLM prefix artifacts
+    # Pattern: starts with # or * or - or | followed by optional space
+    value = re.sub(r'^[#\*\-\|]\s*', '', value)
+
+    # Pattern: starts with a single letter followed by space (like "I 860...")
+    # Only if followed by a digit or @ (for phone/email)
+    value = re.sub(r'^[A-Za-z]\s+(?=[\d@])', '', value)
+
+    # Remove markdown-style formatting
+    value = re.sub(r'^\*\*(.+)\*\*$', r'\1', value)  # **bold**
+    value = re.sub(r'^__(.+)__$', r'\1', value)  # __underline__
+
+    # Strip any remaining whitespace
+    value = value.strip()
+
+    if value != original:
+        logger.debug(f"Cleaned LLM artifact: '{original}' -> '{value}'")
+
+    return value if value else None
+
+
+def _clean_email(value: Optional[str]) -> Optional[str]:
+    """Extract and clean email from potentially messy LLM output."""
+    if not value:
+        return None
+
+    # First apply general cleaning
+    value = _clean_llm_artifacts(value) or ""
+
+    # Try to extract email pattern from string
+    email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
+    match = re.search(email_pattern, value)
+    if match:
+        return match.group(0).lower()
+
+    return None
+
+
+def _clean_phone(value: Optional[str]) -> Optional[str]:
+    """Extract and clean phone number from potentially messy LLM output."""
+    if not value:
+        return None
+
+    # First apply general cleaning
+    value = _clean_llm_artifacts(value) or ""
+
+    # Extract just digits, dots, dashes, parens, plus, and spaces
+    # Keep formatting for readability
+    cleaned = re.sub(r'[^\d\.\-\(\)\+\s]', '', value)
+    cleaned = cleaned.strip()
+
+    # Must have at least 10 digits to be valid
+    digits_only = re.sub(r'\D', '', cleaned)
+    if len(digits_only) >= 10:
+        return cleaned
+
+    return None
+
+
+def _sanitize_parsed_data(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Remove placeholder values and clean LLM artifacts from parsed resume data."""
+
+    # Clean and sanitize email
+    raw_email = data.get("email")
+    cleaned_email = _clean_email(raw_email)
+    if cleaned_email:
+        if _is_placeholder(cleaned_email, "emails"):
+            logger.warning(f"Removing placeholder email: {cleaned_email}")
+            data["email"] = None
+        else:
+            data["email"] = cleaned_email
+            if raw_email != cleaned_email:
+                logger.info(f"Cleaned email: '{raw_email}' -> '{cleaned_email}'")
+    else:
+        data["email"] = None
+
+    # Clean and sanitize phone
+    raw_phone = data.get("phone")
+    cleaned_phone = _clean_phone(raw_phone)
+    if cleaned_phone:
+        data["phone"] = cleaned_phone
+        if raw_phone != cleaned_phone:
+            logger.info(f"Cleaned phone: '{raw_phone}' -> '{cleaned_phone}'")
+    else:
+        data["phone"] = None
+
+    # Clean and sanitize name
+    raw_name = data.get("full_name")
+    cleaned_name = _clean_llm_artifacts(raw_name)
+    if cleaned_name:
+        if _is_placeholder(cleaned_name, "names"):
+            logger.warning(f"Removing placeholder name: {cleaned_name}")
+            data["full_name"] = None
+        else:
+            data["full_name"] = cleaned_name
+    else:
+        data["full_name"] = None
+
+    # Sanitize work experiences
+    work_experiences = data.get("work_experiences", [])
+    sanitized_experiences = []
+    for exp in work_experiences:
+        company = _clean_llm_artifacts(exp.get("company", ""))
+        if not company or _is_placeholder(company, "companies"):
+            logger.warning(f"Removing work experience with placeholder company: {exp.get('company')}")
+            continue  # Skip this experience entirely
+        exp["company"] = company
+        # Also clean title and location
+        if exp.get("title"):
+            exp["title"] = _clean_llm_artifacts(exp["title"])
+        if exp.get("location"):
+            exp["location"] = _clean_llm_artifacts(exp["location"])
+        sanitized_experiences.append(exp)
+    data["work_experiences"] = sanitized_experiences
+
+    return data
+
 
 class ResumeService:
     """Service for parsing and managing resumes."""
@@ -56,6 +218,11 @@ class ResumeService:
         raw_text = await self._extract_text(file_content, file_type)
         if not raw_text or len(raw_text.strip()) < 50:
             raise ValueError("Could not extract meaningful text from resume")
+
+        # Log extracted text for debugging
+        logger.info(f"EXTRACTED TEXT LENGTH: {len(raw_text)} chars")
+        logger.info(f"EXTRACTED TEXT PREVIEW (first 500 chars):\n{raw_text[:500]}")
+        logger.info(f"EXTRACTED TEXT PREVIEW (last 300 chars):\n{raw_text[-300:]}")
 
         # Parse with LLM
         parsed_data = await self._parse_with_llm(raw_text)
@@ -322,62 +489,89 @@ class ResumeService:
         Returns:
             Parsed resume data as dictionary
         """
-        system_prompt = """You are an expert resume parser. Extract structured information from resumes accurately.
-Be thorough in extracting skills, experiences, and achievements.
-For dates, use ISO format (YYYY-MM-DD) or just year (YYYY) if month is not specified.
-For metrics and achievements, preserve exact numbers and percentages."""
+        system_prompt = """You are an expert resume parser. Your job is to extract EXACT information from resumes.
+
+CRITICAL RULES:
+1. Extract ONLY information that ACTUALLY EXISTS in the resume text
+2. NEVER use placeholder values like "example.com", "TechCorp", "Acme Inc", or "John Doe"
+3. If information is not present, use null - do NOT make up or guess values
+4. Extract ALL work experiences - do not skip any positions
+5. Use the EXACT company names, job titles, and email addresses as written in the resume
+6. For dates, use ISO format (YYYY-MM-DD) or just year (YYYY) if month is not specified
+7. For metrics and achievements, preserve exact numbers and percentages"""
+
+        # Use more text to avoid truncating important information
+        resume_text = text[:15000] if len(text) > 15000 else text
 
         prompt = f"""Parse this resume and extract structured information.
 
-RESUME TEXT:
-{text[:8000]}  # Limit to avoid token limits
+IMPORTANT: Extract EXACT values from the text. Do NOT use placeholder values.
+If you cannot find a piece of information, use null instead of making something up.
+Extract ALL work experiences listed - there may be many positions.
 
-Extract the following information in JSON format. Return ONLY valid JSON, no comments:
+RESUME TEXT:
+{resume_text}
+
+Extract the following information in JSON format. Return ONLY valid JSON, no comments or explanations:
 
 {{
-    "full_name": "string or null",
-    "email": "string or null",
-    "phone": "string or null",
-    "location": "string (city, state/country) or null",
-    "linkedin_url": "string or null",
-    "github_url": "string or null",
-    "portfolio_url": "string or null",
-    "summary": "professional summary/objective as string or null",
-    "skills": ["list of skills/technologies"],
-    "certifications": ["list of certifications"],
-    "languages": ["list of spoken languages"],
+    "full_name": "EXACT name from resume or null if not found",
+    "email": "EXACT email address from resume or null if not found",
+    "phone": "EXACT phone number from resume or null if not found",
+    "location": "EXACT location from resume or null if not found",
+    "linkedin_url": "EXACT LinkedIn URL from resume or null",
+    "github_url": "EXACT GitHub URL from resume or null",
+    "portfolio_url": "EXACT portfolio URL from resume or null",
+    "summary": "professional summary/objective as written or null",
+    "skills": ["extract ALL skills and technologies mentioned"],
+    "certifications": ["extract ALL certifications mentioned"],
+    "languages": ["extract spoken languages if mentioned"],
     "education": [
         {{
-            "degree": "degree name",
-            "field": "field of study",
-            "school": "institution name",
+            "degree": "EXACT degree name",
+            "field": "EXACT field of study",
+            "school": "EXACT institution name",
             "year": "graduation year",
             "gpa": "GPA if mentioned or null"
         }}
     ],
     "work_experiences": [
         {{
-            "company": "company name",
-            "title": "job title",
-            "location": "location or null",
+            "company": "EXACT company name as written in resume",
+            "title": "EXACT job title as written in resume",
+            "location": "EXACT location or null",
             "employment_type": "full-time or contract or freelance or part-time or null",
             "is_remote": true or false,
-            "start_date": "YYYY-MM-DD or YYYY or null",
-            "end_date": "YYYY-MM-DD or YYYY or null if current",
+            "start_date": "YYYY-MM-DD or YYYY-MM or YYYY",
+            "end_date": "YYYY-MM-DD or YYYY-MM or YYYY or null if current position",
             "is_current": true or false,
-            "description": "role description",
-            "achievements": ["list of bullet points/achievements"],
-            "skills_used": ["technologies/skills used in this role"],
-            "metrics": {{"key": "value"}}
+            "description": "role description if provided",
+            "achievements": ["ALL bullet points and achievements for this role"],
+            "skills_used": ["technologies and skills used in this role"],
+            "metrics": {{"extracted metrics like revenue, team size, etc"}}
         }}
     ],
     "parse_quality_score": 85
 }}
 
-Note: parse_quality_score should be a number from 0 to 100 indicating your confidence in the parse quality."""
+REMINDERS:
+- Include EVERY work experience, even if there are 5+ positions
+- Use EXACT company names - never substitute with generic names
+- The email should be the ACTUAL email from the resume, not a placeholder
+- parse_quality_score should be 0-100 indicating extraction confidence"""
 
         try:
             result = await self.llm.generate_structured(prompt, system_prompt)
+
+            # Log raw LLM response for debugging
+            logger.info(f"RAW LLM Response - email: {result.get('email')}, name: {result.get('full_name')}")
+            logger.info(f"RAW LLM Response - work_experiences count: {len(result.get('work_experiences', []))}")
+            for i, exp in enumerate(result.get('work_experiences', [])[:3]):
+                logger.info(f"  Experience {i+1}: {exp.get('company')} - {exp.get('title')}")
+
+            # Remove placeholder values that LLMs sometimes generate
+            result = _sanitize_parsed_data(result)
+            logger.info(f"AFTER SANITIZATION - {len(result.get('work_experiences', []))} work experiences, email={result.get('email')}")
             return result
         except Exception as e:
             logger.error(f"LLM parsing failed: {e}")
@@ -425,7 +619,15 @@ Note: parse_quality_score should be a number from 0 to 100 indicating your confi
         resume.skills = data.get("skills", [])
         resume.certifications = data.get("certifications", [])
         resume.languages = data.get("languages", [])
-        resume.education = data.get("education", [])
+
+        # Sanitize education - ensure year and gpa are strings (LLM may return numbers)
+        education = data.get("education", [])
+        for edu in education:
+            if edu.get("year") is not None:
+                edu["year"] = str(edu["year"])
+            if edu.get("gpa") is not None:
+                edu["gpa"] = str(edu["gpa"])
+        resume.education = education
 
         # Parse quality
         resume.parse_quality_score = data.get("parse_quality_score")

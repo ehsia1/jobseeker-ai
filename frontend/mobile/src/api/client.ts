@@ -64,7 +64,7 @@ let tokenCache: string | null = null;
 export async function getToken(): Promise<string | null> {
   // Return cached token immediately if available
   if (tokenCache) {
-    console.log('[API] getToken (cached):', `${tokenCache.substring(0, 20)}...`);
+    console.log('[API] getToken (cached):', `${tokenCache}...`);
     return tokenCache;
   }
 
@@ -312,7 +312,7 @@ export const profileApi = {
 // Resume API
 export const resumeApi = {
   async getResume(): Promise<Resume> {
-    return apiFetch('/resume/');
+    return apiFetch('/resume');
   },
 
   async uploadResume(file: {
@@ -345,7 +345,31 @@ export const resumeApi = {
   },
 
   async deleteResume(): Promise<{ message: string }> {
-    return apiFetch('/resume/', { method: 'DELETE' });
+    return apiFetch('/resume', { method: 'DELETE' });
+  },
+
+  async reparseResume(): Promise<{ message: string; resume: Resume }> {
+    return apiFetch('/resume/reparse', { method: 'POST' });
+  },
+
+  async submitResumeText(text: string): Promise<{ message: string; resume: Resume }> {
+    return apiFetch('/resume/text', {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    });
+  },
+
+  async getResumeDebug(): Promise<{
+    file_name?: string;
+    file_type?: string;
+    raw_text_length: number;
+    raw_text_preview?: string;
+    parse_quality_score?: number;
+    extracted_full_name?: string;
+    extracted_skills_count: number;
+    extracted_work_exp_count: number;
+  }> {
+    return apiFetch('/resume/debug/raw-text');
   },
 };
 
