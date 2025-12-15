@@ -353,7 +353,7 @@ export default function MatchesScreen() {
                 </View>
 
                 {/* Action Items */}
-                {applicationTracker.result.action_items.length > 0 && (
+                {applicationTracker.result.action_items?.length > 0 && (
                   <View style={styles.actionItemsSection}>
                     <Text variant="titleMedium" style={styles.sectionTitle}>
                       Action Items
@@ -415,7 +415,7 @@ export default function MatchesScreen() {
                 )}
 
                 {/* Recommendations */}
-                {applicationTracker.result.recommendations.length > 0 && (
+                {applicationTracker.result.recommendations?.length > 0 && (
                   <View style={styles.insightsSection}>
                     <Text variant="titleMedium" style={styles.sectionTitle}>
                       Recommendations

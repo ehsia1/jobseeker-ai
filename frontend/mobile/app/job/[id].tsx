@@ -203,8 +203,8 @@ export default function JobDetailsScreen() {
     if (!job) return;
     setShowSkillGapModal(true);
     skillGap.run({
-      job_id: job.id,
-      target_role: job.title,
+      target_job_title: job.title,
+      target_job_description: job.description,
     });
   };
 
@@ -213,8 +213,8 @@ export default function JobDetailsScreen() {
     if (!job) return;
     setShowNetworkModal(true);
     networkIntel.run({
-      job_id: job.id,
-      company: job.company,
+      target_company: job.company,
+      target_role: job.title,
     });
   };
 
@@ -223,7 +223,10 @@ export default function JobDetailsScreen() {
     if (!job) return;
     setShowAutoApplyModal(true);
     autoApply.run({
-      job_id: job.id,
+      job_title: job.title,
+      company_name: job.company,
+      job_description: job.description,
+      job_url: job.url,
     });
   };
 
@@ -631,16 +634,16 @@ export default function JobDetailsScreen() {
                   </View>
 
                   {/* Progress/Status */}
-                  {coverLetter.isRunning && (
+                  {(coverLetter.isRunning || (coverLetter.isCompleted && !coverLetter.result)) && (
                     <View style={styles.progressContainer}>
                       <View style={styles.progressHeader}>
                         <ActivityIndicator size="small" color="#3b82f6" />
                         <Text variant="bodySmall" style={styles.progressStep}>
-                          {coverLetter.currentStep || 'Generating cover letter...'}
+                          {coverLetter.isCompleted ? 'Loading results...' : (coverLetter.currentStep || 'Generating cover letter...')}
                         </Text>
                       </View>
                       <ProgressBar
-                        progress={coverLetter.progress / 100}
+                        progress={coverLetter.isCompleted ? 1 : coverLetter.progress / 100}
                         color="#3b82f6"
                         style={styles.progressBar}
                       />
@@ -695,7 +698,7 @@ export default function JobDetailsScreen() {
             style={styles.modalBackdrop}
             onPress={() => setShowInterviewPrepModal(false)}
           />
-          <View style={styles.interviewPrepModalContainer}>
+          <View style={styles.modalKeyboardView}>
             <Surface style={styles.interviewPrepModal}>
               {/* Header */}
               <View style={styles.modalHeader}>
@@ -719,14 +722,14 @@ export default function JobDetailsScreen() {
               </View>
 
               {/* Loading State */}
-              {interviewPrep.isRunning && (
+              {(interviewPrep.isRunning || (interviewPrep.isCompleted && !interviewPrep.result)) && (
                 <View style={styles.interviewPrepLoading}>
                   <ActivityIndicator size="large" color="#3b82f6" />
                   <Text variant="bodyMedium" style={styles.interviewPrepLoadingText}>
-                    {interviewPrep.currentStep || 'Preparing interview materials...'}
+                    {interviewPrep.isCompleted ? 'Loading results...' : (interviewPrep.currentStep || 'Preparing interview materials...')}
                   </Text>
                   <ProgressBar
-                    progress={interviewPrep.progress / 100}
+                    progress={interviewPrep.isCompleted ? 1 : interviewPrep.progress / 100}
                     color="#3b82f6"
                     style={styles.interviewPrepProgressBar}
                   />
@@ -750,7 +753,7 @@ export default function JobDetailsScreen() {
               {interviewPrep.isCompleted && interviewPrep.result && (
                 <ScrollView style={styles.interviewPrepContent}>
                   {/* Focus Areas */}
-                  {interviewPrep.result.focus_areas.length > 0 && (
+                  {interviewPrep.result.focus_areas?.length > 0 && (
                     <View style={styles.interviewPrepSection2}>
                       <Text variant="titleSmall" style={styles.interviewPrepSectionTitle}>
                         Focus Areas
@@ -766,7 +769,7 @@ export default function JobDetailsScreen() {
                   )}
 
                   {/* Prep Tips */}
-                  {interviewPrep.result.prep_tips.length > 0 && (
+                  {interviewPrep.result.prep_tips?.length > 0 && (
                     <View style={styles.interviewPrepSection2}>
                       <Text variant="titleSmall" style={styles.interviewPrepSectionTitle}>
                         Preparation Tips
@@ -783,10 +786,10 @@ export default function JobDetailsScreen() {
                   )}
 
                   {/* Interview Questions */}
-                  {interviewPrep.result.questions.length > 0 && (
+                  {interviewPrep.result.questions?.length > 0 && (
                     <View style={styles.interviewPrepSection2}>
                       <Text variant="titleSmall" style={styles.interviewPrepSectionTitle}>
-                        Practice Questions ({interviewPrep.result.questions.length})
+                        Practice Questions ({interviewPrep.result.questions?.length || 0})
                       </Text>
                       {interviewPrep.result.questions.map((question: InterviewQuestion, idx: number) => (
                         <Pressable
@@ -864,7 +867,7 @@ export default function JobDetailsScreen() {
             style={styles.modalBackdrop}
             onPress={() => setShowSalaryModal(false)}
           />
-          <View style={styles.salaryModalContainer}>
+          <View style={styles.modalKeyboardView}>
             <Surface style={styles.salaryModal}>
               {/* Header */}
               <View style={styles.modalHeader}>
@@ -888,14 +891,14 @@ export default function JobDetailsScreen() {
               </View>
 
               {/* Loading State */}
-              {salaryResearch.isRunning && (
+              {(salaryResearch.isRunning || (salaryResearch.isCompleted && !salaryResearch.result)) && (
                 <View style={styles.salaryLoading}>
                   <ActivityIndicator size="large" color="#10b981" />
                   <Text variant="bodyMedium" style={styles.salaryLoadingText}>
-                    {salaryResearch.currentStep || 'Researching market rates...'}
+                    {salaryResearch.isCompleted ? 'Loading results...' : (salaryResearch.currentStep || 'Researching market rates...')}
                   </Text>
                   <ProgressBar
-                    progress={salaryResearch.progress / 100}
+                    progress={salaryResearch.isCompleted ? 1 : salaryResearch.progress / 100}
                     color="#10b981"
                     style={styles.salaryProgressBar}
                   />
@@ -916,10 +919,10 @@ export default function JobDetailsScreen() {
               )}
 
               {/* Results */}
-              {salaryResearch.isCompleted && salaryResearch.result && (
+              {salaryResearch.isCompleted && salaryResearch.result?.result && (
                 <ScrollView style={styles.salaryContent}>
                   {/* Market Rate */}
-                  {salaryResearch.result.market_rate && (
+                  {salaryResearch.result.result.salary_range && (
                     <View style={styles.salarySection}>
                       <Text variant="titleSmall" style={styles.salarySectionTitle}>
                         Market Rate
@@ -938,13 +941,13 @@ export default function JobDetailsScreen() {
                         </View>
                         <View style={styles.salaryRangeValues}>
                           <Text variant="bodyLarge" style={styles.salaryValueLow}>
-                            {formatSalary(salaryResearch.result.market_rate.low, salaryResearch.result.market_rate.currency)}
+                            {formatSalary(salaryResearch.result.result.salary_range.min_salary, salaryResearch.result.result.salary_range.currency)}
                           </Text>
                           <Text variant="headlineSmall" style={styles.salaryValueMedian}>
-                            {formatSalary(salaryResearch.result.market_rate.median, salaryResearch.result.market_rate.currency)}
+                            {formatSalary(salaryResearch.result.result.salary_range.median_salary, salaryResearch.result.result.salary_range.currency)}
                           </Text>
                           <Text variant="bodyLarge" style={styles.salaryValueHigh}>
-                            {formatSalary(salaryResearch.result.market_rate.high, salaryResearch.result.market_rate.currency)}
+                            {formatSalary(salaryResearch.result.result.salary_range.max_salary, salaryResearch.result.result.salary_range.currency)}
                           </Text>
                         </View>
                         <View style={styles.salaryBar}>
@@ -955,13 +958,37 @@ export default function JobDetailsScreen() {
                     </View>
                   )}
 
-                  {/* Factors */}
-                  {salaryResearch.result.factors.length > 0 && (
+                  {/* Total Compensation */}
+                  {salaryResearch.result.result.total_comp_estimate > 0 && (
+                    <View style={styles.salarySection}>
+                      <Text variant="titleSmall" style={styles.salarySectionTitle}>
+                        Total Compensation Estimate
+                      </Text>
+                      <View style={styles.totalCompCard}>
+                        <Text variant="headlineMedium" style={styles.totalCompValue}>
+                          {formatSalary(salaryResearch.result.result.total_comp_estimate, salaryResearch.result.result.salary_range?.currency || 'USD')}
+                        </Text>
+                        {salaryResearch.result.result.location_adjustment !== 0 && (
+                          <Text variant="bodySmall" style={styles.adjustmentText}>
+                            Location adjustment: {salaryResearch.result.result.location_adjustment > 0 ? '+' : ''}{salaryResearch.result.result.location_adjustment}%
+                          </Text>
+                        )}
+                        {salaryResearch.result.result.experience_adjustment !== 0 && (
+                          <Text variant="bodySmall" style={styles.adjustmentText}>
+                            Experience adjustment: {salaryResearch.result.result.experience_adjustment > 0 ? '+' : ''}{salaryResearch.result.result.experience_adjustment}%
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Key Factors */}
+                  {salaryResearch.result.result.market_data?.key_factors && salaryResearch.result.result.market_data.key_factors.length > 0 && (
                     <View style={styles.salarySection}>
                       <Text variant="titleSmall" style={styles.salarySectionTitle}>
                         Key Factors
                       </Text>
-                      {salaryResearch.result.factors.map((factor: string, idx: number) => (
+                      {salaryResearch.result.result.market_data.key_factors.map((factor: string, idx: number) => (
                         <View key={idx} style={styles.factorItem}>
                           <Ionicons name="trending-up" size={16} color="#10b981" />
                           <Text variant="bodyMedium" style={styles.factorText}>
@@ -972,33 +999,36 @@ export default function JobDetailsScreen() {
                     </View>
                   )}
 
-                  {/* Comparable Roles */}
-                  {salaryResearch.result.comparable_roles.length > 0 && (
+                  {/* Negotiation Leverage */}
+                  {salaryResearch.result.result.negotiation_leverage && salaryResearch.result.result.negotiation_leverage.length > 0 && (
                     <View style={styles.salarySection}>
                       <Text variant="titleSmall" style={styles.salarySectionTitle}>
-                        Comparable Roles
+                        Negotiation Leverage
                       </Text>
-                      <View style={styles.comparableRolesContainer}>
-                        {salaryResearch.result.comparable_roles.map((role: string, idx: number) => (
-                          <Chip key={idx} style={styles.comparableRoleChip}>
-                            {role}
-                          </Chip>
-                        ))}
-                      </View>
-                    </View>
-                  )}
-
-                  {/* Negotiation Tips */}
-                  {salaryResearch.result.negotiation_tips.length > 0 && (
-                    <View style={styles.salarySection}>
-                      <Text variant="titleSmall" style={styles.salarySectionTitle}>
-                        Negotiation Tips
-                      </Text>
-                      {salaryResearch.result.negotiation_tips.map((tip: string, idx: number) => (
+                      {salaryResearch.result.result.negotiation_leverage.map((point: string, idx: number) => (
                         <View key={idx} style={styles.negotiationTipItem}>
                           <Ionicons name="bulb" size={18} color="#f59e0b" />
                           <Text variant="bodyMedium" style={styles.negotiationTipText}>
-                            {tip}
+                            {point}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Negotiation Scripts */}
+                  {salaryResearch.result.result.negotiation_scripts && salaryResearch.result.result.negotiation_scripts.length > 0 && (
+                    <View style={styles.salarySection}>
+                      <Text variant="titleSmall" style={styles.salarySectionTitle}>
+                        Negotiation Scripts
+                      </Text>
+                      {salaryResearch.result.result.negotiation_scripts.map((script: any, idx: number) => (
+                        <View key={idx} style={styles.scriptCard}>
+                          <Text variant="labelMedium" style={styles.scriptScenario}>
+                            {script.scenario}
+                          </Text>
+                          <Text variant="bodySmall" style={styles.scriptText}>
+                            {script.opening}
                           </Text>
                         </View>
                       ))}
@@ -1013,33 +1043,46 @@ export default function JobDetailsScreen() {
 
       {/* Skill Gap Modal */}
       {showSkillGapModal && (
-        <View style={styles.skillGapModalContainer}>
-          <View style={styles.skillGapModalOverlay}>
+        <View style={styles.modalOverlay}>
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => {
+              setShowSkillGapModal(false);
+              skillGap.reset();
+            }}
+          />
+          <View style={styles.modalKeyboardView}>
             <Surface style={styles.skillGapModal}>
               {/* Modal Header */}
               <View style={styles.modalHeader}>
-                <Text variant="titleLarge" style={styles.modalTitle}>
-                  Skill Gap Analysis
-                </Text>
+                <View style={styles.modalHeaderText}>
+                  <Text variant="titleLarge" style={styles.modalTitle}>
+                    Skill Gap Analysis
+                  </Text>
+                  <Text variant="bodySmall" style={styles.modalSubtitle}>
+                    {job?.title} at {job?.company}
+                  </Text>
+                </View>
                 <Pressable
                   onPress={() => {
                     setShowSkillGapModal(false);
                     skillGap.reset();
                   }}
+                  style={styles.closeIconButton}
                 >
                   <Ionicons name="close" size={24} color="#6b7280" />
                 </Pressable>
               </View>
 
               {/* Loading State */}
-              {skillGap.isRunning && (
+              {(skillGap.isRunning || (skillGap.isCompleted && !skillGap.result)) && (
                 <View style={styles.skillGapLoading}>
                   <ActivityIndicator size="large" color="#8b5cf6" />
                   <Text variant="bodyMedium" style={styles.skillGapLoadingText}>
-                    {skillGap.currentStep || 'Analyzing your skills...'}
+                    {skillGap.isCompleted ? 'Loading results...' : (skillGap.currentStep || 'Analyzing your skills...')}
                   </Text>
                   <ProgressBar
-                    progress={skillGap.progress / 100}
+                    progress={skillGap.isCompleted ? 1 : skillGap.progress / 100}
                     color="#8b5cf6"
                     style={styles.skillGapProgressBar}
                   />
@@ -1062,12 +1105,12 @@ export default function JobDetailsScreen() {
               {/* Results State */}
               {skillGap.isCompleted && skillGap.result && (
                 <ScrollView style={styles.skillGapContent}>
-                  {/* Match Score */}
-                  {skillGap.result.match_score !== undefined && (
+                  {/* Match Score - backend uses result.skill_overlap_percent */}
+                  {skillGap.result.result?.skill_overlap_percent !== undefined && (
                     <View style={styles.skillGapScoreSection}>
                       <View style={styles.skillGapScoreCircle}>
                         <Text variant="headlineLarge" style={styles.skillGapScoreValue}>
-                          {skillGap.result.match_score}%
+                          {Math.round(skillGap.result.result.skill_overlap_percent)}%
                         </Text>
                         <Text variant="bodySmall" style={styles.skillGapScoreLabel}>
                           Match
@@ -1076,14 +1119,14 @@ export default function JobDetailsScreen() {
                     </View>
                   )}
 
-                  {/* Matched Skills */}
-                  {skillGap.result.matched_skills.length > 0 && (
+                  {/* Matched Skills - backend uses result.transferable_skills */}
+                  {(skillGap.result.result?.transferable_skills?.length > 0 || skillGap.result.result?.current_skills?.length > 0) && (
                     <View style={styles.skillGapResultSection}>
                       <Text variant="titleMedium" style={styles.skillGapSectionTitle}>
                         <Ionicons name="checkmark-circle" size={20} color="#22c55e" /> Skills You Have
                       </Text>
                       <View style={styles.skillGapChipsContainer}>
-                        {skillGap.result.matched_skills.map((skill: string, idx: number) => (
+                        {[...(skillGap.result.result?.transferable_skills || []), ...(skillGap.result.result?.current_skills || [])].filter((skill, idx, arr) => arr.indexOf(skill) === idx).map((skill: string, idx: number) => (
                           <Chip key={idx} style={styles.matchedSkillChip}>
                             {skill}
                           </Chip>
@@ -1092,13 +1135,13 @@ export default function JobDetailsScreen() {
                     </View>
                   )}
 
-                  {/* Missing Skills */}
-                  {skillGap.result.missing_skills.length > 0 && (
+                  {/* Missing Skills - backend uses result.skill_gaps */}
+                  {skillGap.result.result?.skill_gaps?.length > 0 && (
                     <View style={styles.skillGapResultSection}>
                       <Text variant="titleMedium" style={styles.skillGapSectionTitle}>
                         <Ionicons name="school" size={20} color="#f59e0b" /> Skills to Develop
                       </Text>
-                      {skillGap.result.missing_skills.map((item: SkillGapItem, idx: number) => (
+                      {skillGap.result.result.skill_gaps.map((item: any, idx: number) => (
                         <View key={idx} style={styles.missingSkillItem}>
                           <View style={styles.missingSkillHeader}>
                             <Text variant="bodyLarge" style={styles.missingSkillName}>
@@ -1107,45 +1150,75 @@ export default function JobDetailsScreen() {
                             <Chip
                               style={[
                                 styles.importanceChip,
-                                item.importance === 'required'
+                                item.priority === 'high'
                                   ? styles.requiredChip
                                   : styles.preferredChip,
                               ]}
                               textStyle={styles.importanceChipText}
                             >
-                              {item.importance}
+                              {item.priority === 'high' ? 'required' : item.priority}
                             </Chip>
                           </View>
-                          {item.current_level && (
+                          {item.gap_level && (
                             <Text variant="bodySmall" style={styles.currentLevelText}>
-                              Current level: {item.current_level}
+                              Gap level: {item.gap_level.replace(/_/g, ' ')}
                             </Text>
                           )}
-                          {item.resources && item.resources.length > 0 && (
-                            <View style={styles.resourcesList}>
-                              {item.resources.map((resource: string, rIdx: number) => (
-                                <Text key={rIdx} variant="bodySmall" style={styles.resourceItem}>
-                                  • {resource}
-                                </Text>
-                              ))}
-                            </View>
+                          {item.learning_effort && (
+                            <Text variant="bodySmall" style={styles.currentLevelText}>
+                              Learning effort: {item.learning_effort}
+                            </Text>
                           )}
                         </View>
                       ))}
                     </View>
                   )}
 
-                  {/* Recommendations */}
-                  {skillGap.result.recommendations.length > 0 && (
+                  {/* Quick Wins */}
+                  {skillGap.result.result?.quick_wins?.length > 0 && (
                     <View style={styles.skillGapResultSection}>
                       <Text variant="titleMedium" style={styles.skillGapSectionTitle}>
-                        <Ionicons name="bulb" size={20} color="#3b82f6" /> Recommendations
+                        <Ionicons name="flash" size={20} color="#22c55e" /> Quick Wins
                       </Text>
-                      {skillGap.result.recommendations.map((rec: string, idx: number) => (
+                      {skillGap.result.result.quick_wins.map((rec: string, idx: number) => (
+                        <View key={idx} style={styles.recommendationItem}>
+                          <Ionicons name="checkmark" size={16} color="#22c55e" />
+                          <Text variant="bodyMedium" style={styles.recommendationText}>
+                            {rec}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Long-term Investments */}
+                  {skillGap.result.result?.long_term_investments?.length > 0 && (
+                    <View style={styles.skillGapResultSection}>
+                      <Text variant="titleMedium" style={styles.skillGapSectionTitle}>
+                        <Ionicons name="bulb" size={20} color="#3b82f6" /> Long-term Investments
+                      </Text>
+                      {skillGap.result.result.long_term_investments.map((rec: string, idx: number) => (
                         <View key={idx} style={styles.recommendationItem}>
                           <Ionicons name="arrow-forward" size={16} color="#3b82f6" />
                           <Text variant="bodyMedium" style={styles.recommendationText}>
                             {rec}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Recommended Certifications */}
+                  {skillGap.result.result?.recommended_certifications?.length > 0 && (
+                    <View style={styles.skillGapResultSection}>
+                      <Text variant="titleMedium" style={styles.skillGapSectionTitle}>
+                        <Ionicons name="ribbon" size={20} color="#8b5cf6" /> Recommended Certifications
+                      </Text>
+                      {skillGap.result.result.recommended_certifications.map((cert: any, idx: number) => (
+                        <View key={idx} style={styles.recommendationItem}>
+                          <Ionicons name="school" size={16} color="#8b5cf6" />
+                          <Text variant="bodyMedium" style={styles.recommendationText}>
+                            {cert.name || cert}
                           </Text>
                         </View>
                       ))}
@@ -1160,33 +1233,46 @@ export default function JobDetailsScreen() {
 
       {/* Network Intelligence Modal */}
       {showNetworkModal && (
-        <View style={styles.networkModalContainer}>
-          <View style={styles.networkModalOverlay}>
+        <View style={styles.modalOverlay}>
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => {
+              setShowNetworkModal(false);
+              networkIntel.reset();
+            }}
+          />
+          <View style={styles.modalKeyboardView}>
             <Surface style={styles.networkModal}>
               {/* Modal Header */}
               <View style={styles.modalHeader}>
-                <Text variant="titleLarge" style={styles.modalTitle}>
-                  Company Intelligence
-                </Text>
+                <View style={styles.modalHeaderText}>
+                  <Text variant="titleLarge" style={styles.modalTitle}>
+                    Company Intelligence
+                  </Text>
+                  <Text variant="bodySmall" style={styles.modalSubtitle}>
+                    {job?.company}
+                  </Text>
+                </View>
                 <Pressable
                   onPress={() => {
                     setShowNetworkModal(false);
                     networkIntel.reset();
                   }}
+                  style={styles.closeIconButton}
                 >
                   <Ionicons name="close" size={24} color="#6b7280" />
                 </Pressable>
               </View>
 
               {/* Loading State */}
-              {networkIntel.isRunning && (
+              {(networkIntel.isRunning || (networkIntel.isCompleted && !networkIntel.result)) && (
                 <View style={styles.networkLoading}>
                   <ActivityIndicator size="large" color="#0ea5e9" />
                   <Text variant="bodyMedium" style={styles.networkLoadingText}>
-                    {networkIntel.currentStep || 'Researching company...'}
+                    {networkIntel.isCompleted ? 'Loading results...' : (networkIntel.currentStep || 'Researching company...')}
                   </Text>
                   <ProgressBar
-                    progress={networkIntel.progress / 100}
+                    progress={networkIntel.isCompleted ? 1 : networkIntel.progress / 100}
                     color="#0ea5e9"
                     style={styles.networkProgressBar}
                   />
@@ -1207,96 +1293,132 @@ export default function JobDetailsScreen() {
               )}
 
               {/* Results State */}
-              {networkIntel.isCompleted && networkIntel.result && (
+              {networkIntel.isCompleted && networkIntel.result?.result && (
                 <ScrollView style={styles.networkContent}>
-                  {/* Company Insights */}
-                  {networkIntel.result.company_insights && (
-                    <>
-                      {/* Culture */}
-                      {networkIntel.result.company_insights.culture.length > 0 && (
-                        <View style={styles.networkResultSection}>
-                          <Text variant="titleMedium" style={styles.networkSectionTitle}>
-                            <Ionicons name="heart" size={18} color="#ec4899" /> Company Culture
-                          </Text>
-                          {networkIntel.result.company_insights.culture.map((item: string, idx: number) => (
-                            <View key={idx} style={styles.networkInsightItem}>
-                              <Ionicons name="checkmark" size={16} color="#ec4899" />
-                              <Text variant="bodyMedium" style={styles.networkInsightText}>
-                                {item}
-                              </Text>
-                            </View>
-                          ))}
-                        </View>
-                      )}
-
-                      {/* Recent News */}
-                      {networkIntel.result.company_insights.recent_news.length > 0 && (
-                        <View style={styles.networkResultSection}>
-                          <Text variant="titleMedium" style={styles.networkSectionTitle}>
-                            <Ionicons name="newspaper" size={18} color="#8b5cf6" /> Recent News
-                          </Text>
-                          {networkIntel.result.company_insights.recent_news.map((item: string, idx: number) => (
-                            <View key={idx} style={styles.networkNewsItem}>
-                              <Ionicons name="document-text" size={16} color="#8b5cf6" />
-                              <Text variant="bodyMedium" style={styles.networkNewsText}>
-                                {item}
-                              </Text>
-                            </View>
-                          ))}
-                        </View>
-                      )}
-
-                      {/* Hiring Trends */}
-                      {networkIntel.result.company_insights.hiring_trends.length > 0 && (
-                        <View style={styles.networkResultSection}>
-                          <Text variant="titleMedium" style={styles.networkSectionTitle}>
-                            <Ionicons name="trending-up" size={18} color="#10b981" /> Hiring Trends
-                          </Text>
-                          {networkIntel.result.company_insights.hiring_trends.map((item: string, idx: number) => (
-                            <View key={idx} style={styles.networkTrendItem}>
-                              <Ionicons name="arrow-forward" size={16} color="#10b981" />
-                              <Text variant="bodyMedium" style={styles.networkTrendText}>
-                                {item}
-                              </Text>
-                            </View>
-                          ))}
-                        </View>
-                      )}
-                    </>
-                  )}
-
-                  {/* Potential Connections */}
-                  {networkIntel.result.potential_connections.length > 0 && (
+                  {/* Company Culture */}
+                  {networkIntel.result.result.company_culture?.values?.length > 0 && (
                     <View style={styles.networkResultSection}>
                       <Text variant="titleMedium" style={styles.networkSectionTitle}>
-                        <Ionicons name="people" size={18} color="#0ea5e9" /> Potential Connections
+                        <Ionicons name="heart" size={18} color="#ec4899" /> Company Culture
                       </Text>
-                      {networkIntel.result.potential_connections.map((connection: string, idx: number) => (
-                        <View key={idx} style={styles.connectionItem}>
-                          <View style={styles.connectionAvatar}>
-                            <Ionicons name="person" size={20} color="#0ea5e9" />
-                          </View>
-                          <Text variant="bodyMedium" style={styles.connectionText}>
-                            {connection}
+                      {networkIntel.result.result.company_culture.values.map((item: string, idx: number) => (
+                        <View key={idx} style={styles.networkInsightItem}>
+                          <Ionicons name="checkmark" size={16} color="#ec4899" />
+                          <Text variant="bodyMedium" style={styles.networkInsightText}>
+                            {item}
                           </Text>
                         </View>
                       ))}
                     </View>
                   )}
 
-                  {/* Outreach Suggestions */}
-                  {networkIntel.result.outreach_suggestions.length > 0 && (
+                  {/* Recent News */}
+                  {networkIntel.result.result.company_info?.recent_news?.length > 0 && (
                     <View style={styles.networkResultSection}>
                       <Text variant="titleMedium" style={styles.networkSectionTitle}>
-                        <Ionicons name="mail" size={18} color="#f59e0b" /> Outreach Tips
+                        <Ionicons name="newspaper" size={18} color="#8b5cf6" /> Recent News
                       </Text>
-                      {networkIntel.result.outreach_suggestions.map((tip: string, idx: number) => (
+                      {networkIntel.result.result.company_info.recent_news.map((item: string, idx: number) => (
+                        <View key={idx} style={styles.networkNewsItem}>
+                          <Ionicons name="document-text" size={16} color="#8b5cf6" />
+                          <Text variant="bodyMedium" style={styles.networkNewsText}>
+                            {item}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Hiring Trends */}
+                  {networkIntel.result.result.hiring_trends?.growth_areas?.length > 0 && (
+                    <View style={styles.networkResultSection}>
+                      <Text variant="titleMedium" style={styles.networkSectionTitle}>
+                        <Ionicons name="trending-up" size={18} color="#10b981" /> Hiring Trends
+                      </Text>
+                      {networkIntel.result.result.hiring_trends.growth_areas.map((item: string, idx: number) => (
+                        <View key={idx} style={styles.networkTrendItem}>
+                          <Ionicons name="arrow-forward" size={16} color="#10b981" />
+                          <Text variant="bodyMedium" style={styles.networkTrendText}>
+                            {item}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Hot Skills */}
+                  {networkIntel.result.result.hiring_trends?.hot_skills?.length > 0 && (
+                    <View style={styles.networkResultSection}>
+                      <Text variant="titleMedium" style={styles.networkSectionTitle}>
+                        <Ionicons name="star" size={18} color="#f59e0b" /> In-Demand Skills
+                      </Text>
+                      <View style={styles.chipContainer}>
+                        {networkIntel.result.result.hiring_trends.hot_skills.map((skill: string, idx: number) => (
+                          <Chip key={idx} style={styles.skillChip}>{skill}</Chip>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Potential Contacts */}
+                  {networkIntel.result.result.potential_contacts?.length > 0 && (
+                    <View style={styles.networkResultSection}>
+                      <Text variant="titleMedium" style={styles.networkSectionTitle}>
+                        <Ionicons name="people" size={18} color="#0ea5e9" /> Potential Contacts
+                      </Text>
+                      {networkIntel.result.result.potential_contacts.map((contact: any, idx: number) => (
+                        <View key={idx} style={styles.connectionItem}>
+                          <View style={styles.connectionAvatar}>
+                            <Ionicons name="person" size={20} color="#0ea5e9" />
+                          </View>
+                          <View style={styles.connectionDetails}>
+                            <Text variant="bodyMedium" style={styles.connectionText}>
+                              {contact.role_type} - {contact.department}
+                            </Text>
+                            <Text variant="bodySmall" style={styles.connectionSubtext}>
+                              {contact.value_proposition}
+                            </Text>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Talking Points */}
+                  {networkIntel.result.result.talking_points?.length > 0 && (
+                    <View style={styles.networkResultSection}>
+                      <Text variant="titleMedium" style={styles.networkSectionTitle}>
+                        <Ionicons name="chatbubble" size={18} color="#f59e0b" /> Talking Points
+                      </Text>
+                      {networkIntel.result.result.talking_points.map((point: string, idx: number) => (
                         <View key={idx} style={styles.outreachItem}>
                           <Ionicons name="bulb" size={16} color="#f59e0b" />
                           <Text variant="bodyMedium" style={styles.outreachText}>
-                            {tip}
+                            {point}
                           </Text>
                         </View>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Outreach Templates */}
+                  {networkIntel.result.result.outreach_templates?.length > 0 && (
+                    <View style={styles.networkResultSection}>
+                      <Text variant="titleMedium" style={styles.networkSectionTitle}>
+                        <Ionicons name="mail" size={18} color="#8b5cf6" /> Outreach Templates
+                      </Text>
+                      {networkIntel.result.result.outreach_templates.map((template: any, idx: number) => (
+                        <Surface key={idx} style={styles.templateCard}>
+                          <Text variant="titleSmall" style={styles.templateTitle}>
+                            {template.scenario}
+                          </Text>
+                          <Text variant="bodySmall" style={styles.templatePlatform}>
+                            Platform: {template.platform} | Tone: {template.tone}
+                          </Text>
+                          <Text variant="bodyMedium" style={styles.templateMessage}>
+                            {template.message}
+                          </Text>
+                        </Surface>
                       ))}
                     </View>
                   )}
@@ -1309,33 +1431,47 @@ export default function JobDetailsScreen() {
 
       {/* Auto-Apply Modal */}
       {showAutoApplyModal && (
-        <View style={styles.autoApplyModalContainer}>
-          <View style={styles.autoApplyModalOverlay}>
+        <View style={styles.modalOverlay}>
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => {
+              setShowAutoApplyModal(false);
+              autoApply.reset();
+            }}
+          />
+          <View style={styles.modalKeyboardView}>
             <Surface style={styles.autoApplyModal}>
+              <View style={styles.autoApplyModalContent}>
               {/* Modal Header */}
               <View style={styles.modalHeader}>
-                <Text variant="titleLarge" style={styles.modalTitle}>
-                  Auto-Apply Preparation
-                </Text>
+                <View style={styles.modalHeaderText}>
+                  <Text variant="titleLarge" style={styles.modalTitle}>
+                    Auto-Apply Preparation
+                  </Text>
+                  <Text variant="bodySmall" style={styles.modalSubtitle}>
+                    {job?.company} - {job?.title}
+                  </Text>
+                </View>
                 <Pressable
                   onPress={() => {
                     setShowAutoApplyModal(false);
                     autoApply.reset();
                   }}
+                  style={styles.closeIconButton}
                 >
                   <Ionicons name="close" size={24} color="#6b7280" />
                 </Pressable>
               </View>
 
               {/* Loading State */}
-              {autoApply.isRunning && (
+              {(autoApply.isRunning || (autoApply.isCompleted && !autoApply.result)) && (
                 <View style={styles.autoApplyLoading}>
                   <ActivityIndicator size="large" color="#8b5cf6" />
                   <Text variant="bodyMedium" style={styles.autoApplyLoadingText}>
-                    {autoApply.currentStep || 'Preparing your application...'}
+                    {autoApply.isCompleted ? 'Loading results...' : (autoApply.currentStep || 'Preparing your application...')}
                   </Text>
                   <ProgressBar
-                    progress={autoApply.progress / 100}
+                    progress={autoApply.isCompleted ? 1 : autoApply.progress / 100}
                     color="#8b5cf6"
                     style={styles.autoApplyProgressBar}
                   />
@@ -1356,10 +1492,10 @@ export default function JobDetailsScreen() {
               )}
 
               {/* Results State */}
-              {autoApply.isCompleted && autoApply.result && (
+              {autoApply.isCompleted && autoApply.result?.result && (
                 <ScrollView style={styles.autoApplyContent}>
                   {/* Fit Assessment */}
-                  {autoApply.result.fit_assessment && (
+                  {autoApply.result.result.fit_assessment && (
                     <View style={styles.autoApplyResultSection}>
                       <Text variant="titleMedium" style={styles.autoApplySectionTitle}>
                         <Ionicons name="analytics" size={18} color="#8b5cf6" /> Fit Assessment
@@ -1369,7 +1505,7 @@ export default function JobDetailsScreen() {
                       <View style={styles.fitScoreContainer}>
                         <View style={styles.fitScoreCircle}>
                           <Text variant="headlineMedium" style={styles.fitScoreText}>
-                            {autoApply.result.fit_assessment.overall_fit}%
+                            {autoApply.result.result.fit_assessment.overall_match_score}%
                           </Text>
                         </View>
                         <Text variant="bodyMedium" style={styles.fitScoreLabel}>
@@ -1378,12 +1514,12 @@ export default function JobDetailsScreen() {
                       </View>
 
                       {/* Strengths */}
-                      {autoApply.result.fit_assessment.strengths.length > 0 && (
+                      {autoApply.result.result.fit_assessment.strengths?.length > 0 && (
                         <View style={styles.fitSubsection}>
                           <Text variant="bodyLarge" style={styles.fitSubsectionTitle}>
                             <Ionicons name="checkmark-circle" size={16} color="#22c55e" /> Strengths
                           </Text>
-                          {autoApply.result.fit_assessment.strengths.map((strength: string, idx: number) => (
+                          {autoApply.result.result.fit_assessment.strengths.map((strength: string, idx: number) => (
                             <View key={idx} style={styles.strengthItem}>
                               <Ionicons name="add" size={16} color="#22c55e" />
                               <Text variant="bodyMedium" style={styles.strengthText}>
@@ -1395,12 +1531,12 @@ export default function JobDetailsScreen() {
                       )}
 
                       {/* Gaps */}
-                      {autoApply.result.fit_assessment.gaps.length > 0 && (
+                      {autoApply.result.result.fit_assessment.gaps?.length > 0 && (
                         <View style={styles.fitSubsection}>
                           <Text variant="bodyLarge" style={styles.fitSubsectionTitle}>
                             <Ionicons name="warning" size={16} color="#f59e0b" /> Areas to Address
                           </Text>
-                          {autoApply.result.fit_assessment.gaps.map((gap: string, idx: number) => (
+                          {autoApply.result.result.fit_assessment.gaps.map((gap: string, idx: number) => (
                             <View key={idx} style={styles.gapItem}>
                               <Ionicons name="alert" size={16} color="#f59e0b" />
                               <Text variant="bodyMedium" style={styles.gapText}>
@@ -1414,79 +1550,75 @@ export default function JobDetailsScreen() {
                   )}
 
                   {/* Prepared Materials */}
-                  {autoApply.result.prepared_materials && (
-                    <View style={styles.autoApplyResultSection}>
-                      <Text variant="titleMedium" style={styles.autoApplySectionTitle}>
-                        <Ionicons name="document-text" size={18} color="#0ea5e9" /> Prepared Materials
-                      </Text>
+                  <View style={styles.autoApplyResultSection}>
+                    <Text variant="titleMedium" style={styles.autoApplySectionTitle}>
+                      <Ionicons name="document-text" size={18} color="#0ea5e9" /> Prepared Materials
+                    </Text>
 
-                      {/* Cover Letter Preview */}
-                      {autoApply.result.prepared_materials.cover_letter && (
-                        <View style={styles.materialCard}>
-                          <View style={styles.materialHeader}>
-                            <Ionicons name="mail" size={20} color="#8b5cf6" />
-                            <Text variant="bodyLarge" style={styles.materialTitle}>
-                              Cover Letter
-                            </Text>
-                          </View>
-                          <Text
-                            variant="bodyMedium"
-                            style={styles.materialPreview}
-                            numberOfLines={4}
-                          >
-                            {autoApply.result.prepared_materials.cover_letter}
+                    {/* Cover Letter Preview */}
+                    {autoApply.result.result.cover_letter && (
+                      <View style={styles.materialCard}>
+                        <View style={styles.materialHeader}>
+                          <Ionicons name="mail" size={20} color="#8b5cf6" />
+                          <Text variant="bodyLarge" style={styles.materialTitle}>
+                            Cover Letter
                           </Text>
                         </View>
-                      )}
+                        <Text
+                          variant="bodyMedium"
+                          style={styles.materialPreview}
+                          numberOfLines={4}
+                        >
+                          {autoApply.result.result.cover_letter}
+                        </Text>
+                      </View>
+                    )}
 
-                      {/* Resume Highlights */}
-                      {autoApply.result.prepared_materials.resume_highlights.length > 0 && (
-                        <View style={styles.materialCard}>
-                          <View style={styles.materialHeader}>
-                            <Ionicons name="star" size={20} color="#f59e0b" />
-                            <Text variant="bodyLarge" style={styles.materialTitle}>
-                              Key Resume Highlights
+                    {/* Resume Highlights */}
+                    {autoApply.result.result.customized_resume_points?.length > 0 && (
+                      <View style={styles.materialCard}>
+                        <View style={styles.materialHeader}>
+                          <Ionicons name="star" size={20} color="#f59e0b" />
+                          <Text variant="bodyLarge" style={styles.materialTitle}>
+                            Key Resume Highlights
+                          </Text>
+                        </View>
+                        {autoApply.result.result.customized_resume_points.map((highlight: string, idx: number) => (
+                          <View key={idx} style={styles.highlightItem}>
+                            <Ionicons name="checkmark-circle" size={16} color="#f59e0b" />
+                            <Text variant="bodyMedium" style={styles.highlightText}>
+                              {highlight}
                             </Text>
                           </View>
-                          {autoApply.result.prepared_materials.resume_highlights.map((highlight: string, idx: number) => (
-                            <View key={idx} style={styles.highlightItem}>
-                              <Ionicons name="checkmark-circle" size={16} color="#f59e0b" />
-                              <Text variant="bodyMedium" style={styles.highlightText}>
-                                {highlight}
-                              </Text>
-                            </View>
-                          ))}
-                        </View>
-                      )}
+                        ))}
+                      </View>
+                    )}
 
-                      {/* Screening Answers */}
-                      {autoApply.result.prepared_materials.screening_answers &&
-                       Object.keys(autoApply.result.prepared_materials.screening_answers).length > 0 && (
-                        <View style={styles.materialCard}>
-                          <View style={styles.materialHeader}>
-                            <Ionicons name="help-circle" size={20} color="#10b981" />
-                            <Text variant="bodyLarge" style={styles.materialTitle}>
-                              Screening Questions
+                    {/* Screening Questions */}
+                    {autoApply.result.result.screening_questions?.length > 0 && (
+                      <View style={styles.materialCard}>
+                        <View style={styles.materialHeader}>
+                          <Ionicons name="help-circle" size={20} color="#10b981" />
+                          <Text variant="bodyLarge" style={styles.materialTitle}>
+                            Screening Questions
+                          </Text>
+                        </View>
+                        {autoApply.result.result.screening_questions.map((item: any, idx: number) => (
+                          <View key={idx} style={styles.screeningItem}>
+                            <Text variant="bodyMedium" style={styles.screeningQuestion}>
+                              Q: {item.question}
+                            </Text>
+                            <Text variant="bodyMedium" style={styles.screeningAnswer}>
+                              A: {item.answer}
                             </Text>
                           </View>
-                          {Object.entries(autoApply.result.prepared_materials.screening_answers).map(
-                            ([question, answer], idx) => (
-                              <View key={idx} style={styles.screeningItem}>
-                                <Text variant="bodyMedium" style={styles.screeningQuestion}>
-                                  Q: {question}
-                                </Text>
-                                <Text variant="bodyMedium" style={styles.screeningAnswer}>
-                                  A: {answer as string}
-                                </Text>
-                              </View>
-                            )
-                          )}
-                        </View>
-                      )}
-                    </View>
-                  )}
+                        ))}
+                      </View>
+                    )}
+                  </View>
                 </ScrollView>
               )}
+              </View>
             </Surface>
           </View>
         </View>
@@ -1836,9 +1968,18 @@ const styles = StyleSheet.create({
   },
   // Interview Prep modal styles
   interviewPrepModalContainer: {
-    width: '100%',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 1000,
+  },
+  interviewPrepModalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   interviewPrepModal: {
     backgroundColor: '#fff',
@@ -1993,9 +2134,18 @@ const styles = StyleSheet.create({
   },
   // Salary Research modal styles
   salaryModalContainer: {
-    width: '100%',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 1000,
+  },
+  salaryModalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   salaryModal: {
     backgroundColor: '#fff',
@@ -2124,6 +2274,36 @@ const styles = StyleSheet.create({
     color: '#374151',
     flex: 1,
     lineHeight: 22,
+  },
+  totalCompCard: {
+    backgroundColor: '#f0fdf4',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+  },
+  totalCompValue: {
+    color: '#059669',
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  adjustmentText: {
+    color: '#6b7280',
+    marginTop: 4,
+  },
+  scriptCard: {
+    backgroundColor: '#fffbeb',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+  },
+  scriptScenario: {
+    color: '#92400e',
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  scriptText: {
+    color: '#78350f',
+    lineHeight: 20,
   },
   // Skill Gap Analysis section styles
   skillGapSection: {
@@ -2440,6 +2620,38 @@ const styles = StyleSheet.create({
     flex: 1,
     fontWeight: '500',
   },
+  connectionDetails: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  connectionSubtext: {
+    color: '#64748b',
+    marginTop: 4,
+  },
+  chipContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  templateCard: {
+    backgroundColor: '#f5f3ff',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  templateTitle: {
+    color: '#5b21b6',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  templatePlatform: {
+    color: '#7c3aed',
+    marginBottom: 8,
+  },
+  templateMessage: {
+    color: '#4c1d95',
+    lineHeight: 22,
+  },
   outreachItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -2504,7 +2716,10 @@ const styles = StyleSheet.create({
     maxHeight: '90%',
     borderRadius: 16,
     backgroundColor: '#ffffff',
+  },
+  autoApplyModalContent: {
     overflow: 'hidden',
+    borderRadius: 16,
   },
   autoApplyLoading: {
     padding: 40,

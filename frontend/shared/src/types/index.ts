@@ -463,27 +463,70 @@ export interface SalaryResearchRequest {
 }
 
 export interface SalaryRange {
-  low: number;
-  median: number;
-  high: number;
+  min_salary: number;
+  max_salary: number;
+  median_salary: number;
+  median?: number;
   currency: string;
+}
+
+export interface MarketData {
+  base_salary?: SalaryRange;
+  total_compensation?: Record<string, number>;
+  typical_bonus_percent?: number;
+  typical_equity_value?: number;
+  market_demand?: string;
+  salary_trend?: string;
+  key_factors: string[];
+  data_sources: string[];
+}
+
+export interface NegotiationScript {
+  scenario: string;
+  opening: string;
+  response_to_lowball: string;
+  closing: string;
+}
+
+export interface NegotiationStrategy {
+  approach: string;
+  key_points: string[];
+  timing_recommendations: string[];
+  risks_to_avoid: string[];
+}
+
+export interface SalaryResearchResultData {
+  job_title: string;
+  location: string;
+  salary_range: SalaryRange;
+  market_data?: MarketData;
+  compensation_analysis?: Record<string, any>;
+  total_comp_estimate: number;
+  location_adjustment: number;
+  experience_adjustment: number;
+  negotiation_leverage: string[];
+  negotiation_strategy?: NegotiationStrategy;
+  negotiation_scripts: NegotiationScript[];
+  counter_offer_template: string;
 }
 
 export interface SalaryResearchResult {
   run_id: string;
   status: AgentStatus;
-  market_rate?: SalaryRange;
-  factors: string[];
-  negotiation_tips: string[];
-  comparable_roles: string[];
+  user_id: string;
+  started_at: string;
+  completed_at?: string;
+  result?: SalaryResearchResultData;
   messages: string[];
   errors: string[];
 }
 
 // Skill Gap Agent
 export interface SkillGapRequest {
-  job_id?: string;
-  target_role?: string;
+  target_job_title: string;
+  target_job_description?: string;
+  target_industry?: string;
+  focus_areas?: string[];
 }
 
 export interface SkillGapItem {
@@ -584,8 +627,9 @@ export interface ApplicationTrackerResult {
 
 // Network Intelligence Agent
 export interface NetworkIntelligenceRequest {
-  job_id?: string;
-  company?: string;
+  target_company: string;
+  target_role?: string;
+  target_industry?: string;
 }
 
 export interface NetworkIntelligenceResult {
@@ -604,7 +648,11 @@ export interface NetworkIntelligenceResult {
 
 // Auto-Apply Agent
 export interface AutoApplyRequest {
-  job_id: string;
+  job_title: string;
+  company_name: string;
+  job_description: string;
+  job_url?: string;
+  application_type?: string;
 }
 
 export interface AutoApplyResult {

@@ -643,9 +643,17 @@ Return ONLY the JSON, no other text."""
 
             messages.append(f"Generated {len(result.get('scripts', []))} negotiation scripts")
 
+            # Handle counter_offer_template - LLM may return string or dict
+            template = result.get("counter_offer_email_template", "")
+            if isinstance(template, dict):
+                # Convert dict to string - combine subject and body
+                subject = template.get("subject", "")
+                body = template.get("body", "")
+                template = f"Subject: {subject}\n\n{body}" if subject else body
+
             return {
                 "negotiation_scripts": result.get("scripts", []),
-                "counter_offer_template": result.get("counter_offer_email_template", ""),
+                "counter_offer_template": template,
                 "messages": messages,
             }
 

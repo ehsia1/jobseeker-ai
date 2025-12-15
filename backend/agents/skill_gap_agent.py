@@ -298,7 +298,7 @@ Return ONLY valid JSON, no additional text."""
 
         try:
             response = await self.llm_service.generate(prompt)
-            result = extract_json(response)
+            result = extract_json(response.content)
             required_skills = result.get("required_skills", [])
 
             return {
@@ -360,7 +360,7 @@ Return ONLY valid JSON, no additional text."""
 
         try:
             response = await self.llm_service.generate(prompt)
-            result = extract_json(response)
+            result = extract_json(response.content)
 
             skill_gaps = result.get("skill_gaps", [])
             transferable_skills = result.get("transferable_skills", [])
@@ -424,7 +424,7 @@ Return ONLY valid JSON, no additional text."""
 
         try:
             response = await self.llm_service.generate(prompt)
-            result = extract_json(response)
+            result = extract_json(response.content)
 
             market_demand = result.get("market_demand", {})
             salary_impact = {}
@@ -517,7 +517,7 @@ Return ONLY valid JSON, no additional text."""
 
         try:
             response = await self.llm_service.generate(prompt)
-            result = extract_json(response)
+            result = extract_json(response.content)
 
             learning_resources = result.get("learning_resources", [])
             recommended_certifications = result.get("recommended_certifications", []) if include_certifications else []
@@ -624,7 +624,7 @@ Return ONLY valid JSON, no additional text."""
 
         try:
             response = await self.llm_service.generate(prompt)
-            result = extract_json(response)
+            result = extract_json(response.content)
 
             learning_roadmap = result.get("roadmap", {})
 
