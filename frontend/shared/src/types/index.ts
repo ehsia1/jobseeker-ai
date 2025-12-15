@@ -1,6 +1,15 @@
 // JobSeeker AI Shared Types
 
 // ============= User Types =============
+export interface UserResumeSummary {
+  id: string;
+  file_name?: string;
+  url?: string;
+  uploaded_at: string;
+  full_name?: string;
+  skills: string[];
+}
+
 export interface User {
   id: string;
   email: string;
@@ -8,6 +17,7 @@ export interface User {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  resume?: UserResumeSummary;
 }
 
 export interface UserProfile {

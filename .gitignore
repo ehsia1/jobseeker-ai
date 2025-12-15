@@ -114,3 +114,5 @@ coverage/
 htmlcov/
 junit.xml
 test-results/
+
+samples/

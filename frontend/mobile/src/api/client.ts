@@ -328,7 +328,7 @@ export const resumeApi = {
       type: file.type,
     } as any);
 
-    const response = await fetch(`${API_URL}/resume/upload/`, {
+    const response = await fetch(`${API_URL}/resume/upload`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,

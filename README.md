@@ -108,6 +108,45 @@ jobseeker-ai/
 - Multi-armed bandit optimization
 - User preference adaptation
 
+## 📱 Mobile Development
+
+### iOS Simulator Testing
+
+To test file uploads (resumes, documents) on the iOS simulator, you need to transfer files to the simulator's file system.
+
+**Loading test files onto iOS Simulator:**
+
+1. Place your test files in the `samples/` folder (gitignored)
+2. Start a local file server:
+   ```bash
+   cd samples
+   python3 -m http.server 8888
+   ```
+3. In the iOS simulator:
+   - Open Safari
+   - Navigate to `http://localhost:8888`
+   - Tap your file (e.g., `resume.pdf`)
+   - Tap Share → "Save to Files"
+4. The file is now available in the Files app for document picker access
+
+### Running the Mobile App
+
+```bash
+cd frontend/mobile
+
+# Install dependencies
+npm install
+
+# Start Expo development server
+npx expo start
+
+# Run on iOS simulator
+npx expo run:ios
+
+# Run on Android emulator
+npx expo run:android
+```
+
 ## 🧪 Development Workflow
 
 ### Running Tests

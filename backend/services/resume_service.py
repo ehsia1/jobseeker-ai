@@ -1,8 +1,10 @@
 """Resume parsing and management service."""
 
+import asyncio
 import io
 import logging
 import re
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime
 from typing import Optional, Dict, Any, List, BinaryIO
 from uuid import UUID
@@ -241,6 +243,11 @@ class ResumeService:
 
     async def _extract_pdf_text(self, file_content: bytes) -> str:
         """Extract text from PDF file."""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self._extract_pdf_text_sync, file_content)
+
+    def _extract_pdf_text_sync(self, file_content: bytes) -> str:
+        """Synchronous PDF text extraction (runs in thread pool)."""
         try:
             import pdfplumber
 
@@ -261,6 +268,11 @@ class ResumeService:
 
     async def _extract_docx_text(self, file_content: bytes) -> str:
         """Extract text from DOCX file."""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self._extract_docx_text_sync, file_content)
+
+    def _extract_docx_text_sync(self, file_content: bytes) -> str:
+        """Synchronous DOCX text extraction (runs in thread pool)."""
         try:
             from docx import Document
 

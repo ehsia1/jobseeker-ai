@@ -10,6 +10,7 @@ from passlib.context import CryptContext
 
 from backend.database import get_db
 from backend.models.user import User, UserProfile
+from backend.models.resume import Resume
 from backend.api.schemas.user import UserCreate, UserRead, UserWithProfile, UserProfileRead
 from backend.config import settings
 
@@ -181,28 +182,44 @@ async def login(
     }
 
 
-@router.get("/me", response_model=UserWithProfile)
+@router.get("/me")
 async def get_current_user_info(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get current user information with profile."""
-    
+    """Get current user information with profile and resume summary."""
+
     # Load user with profile
     result = await db.execute(
         select(User).where(User.id == current_user.id)
     )
     user = result.scalar_one()
-    
+
     # Get profile separately to ensure it's loaded
     profile_result = await db.execute(
         select(UserProfile).where(UserProfile.user_id == user.id)
     )
     profile = profile_result.scalar_one_or_none()
-    
+
+    # Get resume summary
+    resume_result = await db.execute(
+        select(Resume).where(Resume.user_id == user.id)
+    )
+    resume = resume_result.scalar_one_or_none()
+
     user_dict = UserRead.model_validate(user).model_dump()
     if profile:
         user_dict["profile"] = UserProfileRead.model_validate(profile).model_dump()
+
+    # Add resume summary if exists
+    if resume:
+        user_dict["resume"] = {
+            "id": str(resume.id),
+            "file_name": resume.file_name,
+            "uploaded_at": resume.parsed_at.isoformat() if resume.parsed_at else resume.created_at.isoformat(),
+            "full_name": resume.full_name,
+            "skills": resume.skills or [],
+        }
 
     return user_dict
 

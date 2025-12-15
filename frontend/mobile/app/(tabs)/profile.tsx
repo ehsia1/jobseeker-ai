@@ -25,7 +25,7 @@ import type { ResumeOptimizeSuggestion } from '@jobseeker/shared';
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { user, logout, isLoading } = useAuth();
+  const { user, logout, isLoading, refreshUser } = useAuth();
   const { data: profile, isLoading: isLoadingProfile, refetch: refetchProfile } = useProfile();
   const updateProfile = useUpdateProfile();
   const [pushNotifications, setPushNotifications] = React.useState(true);
@@ -94,6 +94,7 @@ export default function ProfileScreen() {
 
       Alert.alert('Success', 'Resume uploaded successfully');
       refetchProfile();
+      refreshUser();
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to upload resume');
     } finally {
@@ -225,7 +226,7 @@ export default function ProfileScreen() {
         <Card.Title title="Resume" titleVariant="titleMedium" />
         <Divider />
         {user?.resume ? (
-          <>
+          <View>
             <List.Item
               title={user.resume.file_name || 'Resume uploaded'}
               description={`Uploaded ${new Date(user.resume.uploaded_at).toLocaleDateString()}`}
@@ -256,7 +257,7 @@ export default function ProfileScreen() {
             >
               {resumeOptimize.isRunning ? 'Analyzing...' : 'Optimize Resume'}
             </Button>
-          </>
+          </View>
         ) : (
           <View style={styles.noResume}>
             <Text variant="bodyMedium" style={styles.noResumeText}>
