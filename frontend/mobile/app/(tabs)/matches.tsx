@@ -177,7 +177,11 @@ export default function MatchesScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <View style={styles.headerRow}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tabsScrollContent}
+        >
           <SegmentedButtons
             value={statusFilter}
             onValueChange={(value) => setStatusFilter(value as StatusFilter)}
@@ -185,10 +189,12 @@ export default function MatchesScreen() {
               { value: 'all', label: 'All' },
               { value: 'saved', label: 'Saved' },
               { value: 'applied', label: 'Applied' },
-              { value: 'interviewing', label: 'Interview' },
+              { value: 'interviewing', label: 'Interviewing' },
             ]}
             style={styles.segmentedButtons}
           />
+        </ScrollView>
+        <View style={styles.headerRow}>
           <Button
             mode="contained"
             onPress={handleGetBriefing}
@@ -198,7 +204,7 @@ export default function MatchesScreen() {
             icon="clipboard-text"
             compact
           >
-            {applicationTracker.isRunning ? 'Loading...' : 'Briefing'}
+            {applicationTracker.isRunning ? 'Loading...' : 'Get Application Briefing'}
           </Button>
         </View>
 
@@ -507,17 +513,20 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
+    marginTop: 12,
+  },
+  tabsScrollContent: {
+    flexGrow: 1,
   },
   segmentedButtons: {
-    flex: 1,
     backgroundColor: '#f3f4f6',
   },
   briefingButton: {
     backgroundColor: '#3b82f6',
   },
   briefingButtonLabel: {
-    fontSize: 12,
+    fontSize: 13,
   },
   briefingBanner: {
     marginTop: 8,
