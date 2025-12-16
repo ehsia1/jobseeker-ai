@@ -28,20 +28,22 @@ async def list_jobs(
     offset: int = Query(0, ge=0),
     remote_only: bool = Query(False),
     min_rate: float = Query(None, ge=0),
+    max_rate: float = Query(None, ge=0),
     source: str = Query(None),
+    location: str = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """List jobs with filtering."""
-    
+
     query = select(Job).order_by(desc(Job.posted_at))
-    
+
     # Apply filters
     filters = []
-    
+
     if remote_only:
         filters.append(Job.remote == True)
-    
+
     if min_rate is not None:
         filters.append(
             or_(
@@ -49,9 +51,21 @@ async def list_jobs(
                 Job.rate_max >= min_rate
             )
         )
-    
+
+    if max_rate is not None:
+        filters.append(
+            or_(
+                Job.rate_max <= max_rate,
+                Job.rate_min <= max_rate
+            )
+        )
+
     if source:
         filters.append(Job.source == source)
+
+    if location:
+        # Case-insensitive location search
+        filters.append(Job.location.ilike(f"%{location}%"))
     
     if filters:
         query = query.where(and_(*filters))

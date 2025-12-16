@@ -1,17 +1,18 @@
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { jobsApi, matchesApi, profileApi, usersApi } from '../api/client';
-import type { SearchQuery, JobMatchStatus, UserProfile, Resume, User } from '@jobseeker/shared';
+import type { SearchQuery, JobMatchStatus, UserProfile, Resume, User, JobFilters } from '@jobseeker/shared';
 import { useAuth } from '../contexts/AuthContext';
 
 // Fetch jobs with infinite scroll
-export function useJobsInfinite(options?: { remote_only?: boolean; size?: number }) {
+export function useJobsInfinite(options?: { filters?: JobFilters; size?: number }) {
   const size = options?.size ?? 20;
+  const filters = options?.filters;
   const { isAuthenticated, isLoading } = useAuth();
 
   return useInfiniteQuery({
-    queryKey: ['jobs', 'infinite', options?.remote_only],
+    queryKey: ['jobs', 'infinite', filters],
     queryFn: async ({ pageParam = 1 }) => {
-      const result = await jobsApi.getJobs(pageParam, size);
+      const result = await jobsApi.getJobs(pageParam, size, filters);
       // Transform to match expected format (items -> jobs)
       return {
         jobs: result.items,

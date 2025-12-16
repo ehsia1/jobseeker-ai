@@ -112,6 +112,16 @@ export interface JobMatch {
   updated_at: string;
 }
 
+// ============= Filter Types =============
+export interface JobFilters {
+  remote_only?: boolean;
+  min_rate?: number;
+  max_rate?: number;
+  source?: string;
+  location?: string;
+  rate_type?: 'hourly' | 'fixed' | 'annual';
+}
+
 // ============= Search Types =============
 export interface SearchQuery {
   keywords?: string[];

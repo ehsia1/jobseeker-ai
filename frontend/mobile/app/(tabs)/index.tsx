@@ -8,18 +8,47 @@ import {
   Alert,
   TouchableOpacity,
 } from 'react-native';
-import { Text, Searchbar, Chip, ProgressBar, Button, Portal, Modal } from 'react-native-paper';
+import { Text, Searchbar, Chip, ProgressBar, Button, Portal, Modal, IconButton, TextInput } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { useJobsInfinite, useMatchesInfinite, useSaveJob } from '../../src/hooks/useJobs';
 import { useJobRadar } from '../../src/hooks/useAgent';
 import JobCard from '../../src/components/JobCard';
-import type { ScoredJob, JobRadarMatch } from '@jobseeker/shared';
+import type { ScoredJob, JobRadarMatch, JobFilters } from '@jobseeker/shared';
 
 export default function JobFeedScreen() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
-  const [remoteOnly, setRemoteOnly] = useState(false);
   const [radarModalVisible, setRadarModalVisible] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Filter state
+  const [remoteOnly, setRemoteOnly] = useState(false);
+  const [selectedRateRange, setSelectedRateRange] = useState<string | null>(null);
+  const [location, setLocation] = useState('');
+  const [source, setSource] = useState<string | undefined>(undefined);
+
+  // Preset rate range options
+  const rateRanges = [
+    { label: '$25-50/hr', value: '25-50', min: 25, max: 50 },
+    { label: '$50-100/hr', value: '50-100', min: 50, max: 100 },
+    { label: '$100-150/hr', value: '100-150', min: 100, max: 150 },
+    { label: '$150+/hr', value: '150+', min: 150, max: undefined },
+  ];
+
+  // Get min/max from selected range
+  const selectedRange = rateRanges.find(r => r.value === selectedRateRange);
+
+  // Build filters object
+  const filters: JobFilters = useMemo(() => ({
+    remote_only: remoteOnly || undefined,
+    min_rate: selectedRange?.min,
+    max_rate: selectedRange?.max,
+    location: location || undefined,
+    source: source || undefined,
+  }), [remoteOnly, selectedRange, location, source]);
+
+  // Check if any filters are active
+  const hasActiveFilters = remoteOnly || selectedRateRange || location || source;
 
   // Job Radar agent
   const jobRadar = useJobRadar();
@@ -34,7 +63,7 @@ export default function JobFeedScreen() {
     error,
     refetch,
     isRefetching,
-  } = useJobsInfinite({ remote_only: remoteOnly });
+  } = useJobsInfinite({ filters });
 
   // Fetch matches to know which jobs are saved
   const { data: matchesData } = useMatchesInfinite();
@@ -180,6 +209,14 @@ export default function JobFeedScreen() {
           >
             Remote Only
           </Chip>
+          <Chip
+            icon={showFilters ? 'chevron-up' : 'filter-variant'}
+            onPress={() => setShowFilters(!showFilters)}
+            style={[styles.chip, hasActiveFilters && styles.activeFilterChip]}
+            textStyle={styles.chipText}
+          >
+            Filters{hasActiveFilters ? ' •' : ''}
+          </Chip>
           <Button
             mode="contained"
             onPress={handleRunRadar}
@@ -192,6 +229,84 @@ export default function JobFeedScreen() {
             {jobRadar.isRunning ? 'Scanning...' : 'Job Radar'}
           </Button>
         </View>
+
+        {/* Expandable Filter Panel */}
+        {showFilters && (
+          <View style={styles.filterPanel}>
+            {/* Rate Range Chips */}
+            <View style={styles.filterSection}>
+              <Text variant="labelMedium" style={styles.filterLabel}>Hourly Rate:</Text>
+              <View style={styles.rateChips}>
+                {rateRanges.map((range) => (
+                  <Chip
+                    key={range.value}
+                    selected={selectedRateRange === range.value}
+                    onPress={() => setSelectedRateRange(
+                      selectedRateRange === range.value ? null : range.value
+                    )}
+                    style={[
+                      styles.rateChip,
+                      selectedRateRange === range.value && styles.rateChipSelected
+                    ]}
+                    textStyle={[
+                      styles.rateChipText,
+                      selectedRateRange === range.value && styles.rateChipTextSelected
+                    ]}
+                    showSelectedOverlay
+                  >
+                    {range.label}
+                  </Chip>
+                ))}
+              </View>
+            </View>
+
+            {/* Location Input */}
+            <TextInput
+              label="Location"
+              value={location}
+              onChangeText={setLocation}
+              style={styles.filterInputFull}
+              mode="outlined"
+              dense
+              placeholder="e.g. San Francisco, New York"
+            />
+
+            {/* Source Chips */}
+            <View style={styles.filterSection}>
+              <Text variant="labelMedium" style={styles.filterLabel}>Source:</Text>
+              <View style={styles.sourceFilters}>
+                {['upwork', 'linkedin', 'indeed'].map((s) => (
+                  <Chip
+                    key={s}
+                    selected={source === s}
+                    onPress={() => setSource(source === s ? undefined : s)}
+                    style={styles.sourceChip}
+                    textStyle={styles.sourceChipText}
+                    compact
+                  >
+                    {s}
+                  </Chip>
+                ))}
+              </View>
+            </View>
+
+            {hasActiveFilters && (
+              <Button
+                mode="text"
+                onPress={() => {
+                  setRemoteOnly(false);
+                  setSelectedRateRange(null);
+                  setLocation('');
+                  setSource(undefined);
+                }}
+                compact
+                style={styles.clearButton}
+              >
+                Clear All Filters
+              </Button>
+            )}
+          </View>
+        )}
 
         {/* Job Radar Progress Banner */}
         {jobRadar.isRunning && (
@@ -386,6 +501,63 @@ const styles = StyleSheet.create({
   },
   chipText: {
     fontSize: 12,
+  },
+  activeFilterChip: {
+    backgroundColor: '#c7d2fe',
+    borderColor: '#6366f1',
+    borderWidth: 1,
+  },
+  // Filter Panel styles
+  filterPanel: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  filterSection: {
+    marginBottom: 12,
+  },
+  filterLabel: {
+    color: '#6b7280',
+    marginBottom: 8,
+  },
+  rateChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  rateChip: {
+    backgroundColor: '#f3f4f6',
+  },
+  rateChipSelected: {
+    backgroundColor: '#dbeafe',
+  },
+  rateChipText: {
+    fontSize: 12,
+  },
+  rateChipTextSelected: {
+    color: '#1d4ed8',
+    fontWeight: '500',
+  },
+  filterInputFull: {
+    backgroundColor: '#fff',
+    marginBottom: 12,
+  },
+  sourceFilters: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  sourceChip: {
+    backgroundColor: '#f3f4f6',
+  },
+  sourceChipText: {
+    fontSize: 11,
+    textTransform: 'capitalize',
+  },
+  clearButton: {
+    marginTop: 4,
+    alignSelf: 'flex-start',
   },
   listContent: {
     padding: 16,

@@ -36,6 +36,7 @@ import type {
   NetworkIntelligenceResult,
   AutoApplyRequest,
   AutoApplyResult,
+  JobFilters,
 } from '../../shared/src/types';
 
 // For simulators/emulators:
@@ -222,9 +223,21 @@ export const authApi = {
 // Note: FastAPI requires trailing slashes - without them, it returns 307 redirects
 // which cause the Authorization header to be lost
 export const jobsApi = {
-  async getJobs(page = 1, size = 20): Promise<PaginatedResponse<Job>> {
+  async getJobs(page = 1, size = 20, filters?: JobFilters): Promise<PaginatedResponse<Job>> {
     const offset = (page - 1) * size;
-    const jobs = await apiFetch<Job[]>(`/jobs/?limit=${size}&offset=${offset}`);
+    const params = new URLSearchParams();
+    params.set('limit', size.toString());
+    params.set('offset', offset.toString());
+
+    // Add filter parameters if provided
+    if (filters?.remote_only) params.set('remote_only', 'true');
+    if (filters?.min_rate !== undefined) params.set('min_rate', filters.min_rate.toString());
+    if (filters?.max_rate !== undefined) params.set('max_rate', filters.max_rate.toString());
+    if (filters?.source) params.set('source', filters.source);
+    if (filters?.location) params.set('location', filters.location);
+    if (filters?.rate_type) params.set('rate_type', filters.rate_type);
+
+    const jobs = await apiFetch<Job[]>(`/jobs/?${params.toString()}`);
     return {
       items: jobs,
       total: jobs.length,
