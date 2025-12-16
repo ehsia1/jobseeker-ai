@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { jobsApi, matchesApi, profileApi } from '../api/client';
-import type { SearchQuery, JobMatchStatus, UserProfile, Resume } from '@jobseeker/shared';
+import { jobsApi, matchesApi, profileApi, usersApi } from '../api/client';
+import type { SearchQuery, JobMatchStatus, UserProfile, Resume, User } from '@jobseeker/shared';
 import { useAuth } from '../contexts/AuthContext';
 
 // Fetch jobs with infinite scroll
@@ -253,5 +253,51 @@ export function useResumeDebug() {
     queryFn: () => resumeApi.getResumeDebug(),
     enabled: isAuthenticated,
     staleTime: 0, // Always fetch fresh
+  });
+}
+
+// ============= User Hooks =============
+
+// Update user contact info (full_name, phone)
+export function useUpdateUser() {
+  const queryClient = useQueryClient();
+  const { refreshUser } = useAuth();
+
+  return useMutation({
+    mutationFn: (data: { full_name?: string; phone?: string }) =>
+      usersApi.updateUser(data),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['auth'] });
+      await refreshUser();
+    },
+  });
+}
+
+// Upload user avatar
+export function useUploadAvatar() {
+  const queryClient = useQueryClient();
+  const { refreshUser } = useAuth();
+
+  return useMutation({
+    mutationFn: (file: { uri: string; name: string; type: string }) =>
+      usersApi.uploadAvatar(file),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['auth'] });
+      await refreshUser();
+    },
+  });
+}
+
+// Delete user avatar
+export function useDeleteAvatar() {
+  const queryClient = useQueryClient();
+  const { refreshUser } = useAuth();
+
+  return useMutation({
+    mutationFn: () => usersApi.deleteAvatar(),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['auth'] });
+      await refreshUser();
+    },
   });
 }

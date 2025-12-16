@@ -52,7 +52,7 @@ function getDefaultApiUrl(): string {
   }) as string;
 }
 
-const API_URL = getDefaultApiUrl();
+export const API_URL = getDefaultApiUrl();
 const TOKEN_KEY = 'auth_token';
 
 console.log('[API] Initialized with URL:', API_URL);
@@ -306,6 +306,49 @@ export const profileApi = {
       method: 'PUT',
       body: JSON.stringify(profile),
     });
+  },
+};
+
+// Users API - for updating user contact info and avatar
+export const usersApi = {
+  async updateUser(data: { full_name?: string; phone?: string }): Promise<User> {
+    return apiFetch('/users/me/', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async uploadAvatar(file: {
+    uri: string;
+    name: string;
+    type: string;
+  }): Promise<User> {
+    const token = await getToken();
+    const formData = new FormData();
+    formData.append('file', {
+      uri: file.uri,
+      name: file.name,
+      type: file.type,
+    } as any);
+
+    const response = await fetch(`${API_URL}/users/me/avatar`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Upload failed' }));
+      throw new Error(error.detail || 'Avatar upload failed');
+    }
+
+    return response.json();
+  },
+
+  async deleteAvatar(): Promise<User> {
+    return apiFetch('/users/me/avatar', { method: 'DELETE' });
   },
 };
 

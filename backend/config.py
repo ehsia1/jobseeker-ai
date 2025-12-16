@@ -102,6 +102,10 @@ class Settings(BaseSettings):
     stripe_price_pro: Optional[str] = Field(default=None, env="STRIPE_PRICE_PRO")
     stripe_price_power: Optional[str] = Field(default=None, env="STRIPE_PRICE_POWER")
 
+    # File Upload Settings
+    uploads_dir: str = Field(default="uploads", env="UPLOADS_DIR")
+    max_avatar_size: int = Field(default=5 * 1024 * 1024, env="MAX_AVATAR_SIZE")  # 5MB
+
     @property
     def stripe_configured(self) -> bool:
         """Check if Stripe is properly configured."""

@@ -28,6 +28,11 @@ class User(Base):
     is_premium = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    # Contact info (editable by user)
+    full_name = Column(String(255), nullable=True)
+    phone = Column(String(50), nullable=True)
+    profile_picture_url = Column(String(500), nullable=True)
     
     # Relationships
     profile = relationship("UserProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")

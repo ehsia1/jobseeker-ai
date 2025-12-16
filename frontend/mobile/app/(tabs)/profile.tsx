@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Alert, Linking, TouchableOpacity, Pressable } from 'react-native';
+import { View, StyleSheet, ScrollView, Alert, Linking, TouchableOpacity, Pressable, Image } from 'react-native';
 import {
   Text,
   Button,
@@ -19,6 +19,25 @@ import * as DocumentPicker from 'expo-document-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useProfile, useUpdateProfile, useUploadResume, useReparseResume, useSubmitResumeText } from '../../src/hooks/useJobs';
+import { API_URL } from '../../src/api/client';
+
+// Get full avatar URL from relative path
+function getAvatarUrl(profilePictureUrl: string | null | undefined): string | null {
+  if (!profilePictureUrl) return null;
+  if (profilePictureUrl.startsWith('http')) return profilePictureUrl;
+  return `${API_URL}${profilePictureUrl}`;
+}
+
+// Format phone number for display: (555) 555-5555
+function formatPhoneNumber(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const digits = value.replace(/\D/g, '');
+  if (digits.length === 0) return null;
+  if (digits.length <= 3) return `(${digits}`;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  if (digits.length <= 10) return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+}
 import { useResumeOptimizer } from '../../src/hooks/useAgent';
 import type { ResumeOptimizeSuggestion } from '@jobseeker/shared';
 import { TextInput as RNTextInput } from 'react-native';
@@ -169,11 +188,18 @@ export default function ProfileScreen() {
     <ScrollView style={styles.container}>
       <Card style={styles.profileCard}>
         <View style={styles.profileHeader}>
-          <Avatar.Text
-            size={80}
-            label={getInitials(user?.full_name, user?.email)}
-            style={styles.avatar}
-          />
+          {user?.profile_picture_url ? (
+            <Image
+              source={{ uri: getAvatarUrl(user.profile_picture_url)! }}
+              style={styles.avatarImage}
+            />
+          ) : (
+            <Avatar.Text
+              size={80}
+              label={getInitials(user?.full_name, user?.email)}
+              style={styles.avatar}
+            />
+          )}
           <View style={styles.profileInfo}>
             <Text variant="titleLarge" style={styles.name}>
               {user?.full_name || 'No name set'}
@@ -181,6 +207,11 @@ export default function ProfileScreen() {
             <Text variant="bodyMedium" style={styles.email}>
               {user?.email}
             </Text>
+            {user?.phone && (
+              <Text variant="bodyMedium" style={styles.phone}>
+                {formatPhoneNumber(user.phone)}
+              </Text>
+            )}
           </View>
         </View>
         <Button
@@ -684,6 +715,11 @@ const styles = StyleSheet.create({
   avatar: {
     backgroundColor: '#3b82f6',
   },
+  avatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
   profileInfo: {
     marginLeft: 16,
     flex: 1,
@@ -693,6 +729,10 @@ const styles = StyleSheet.create({
     color: '#111827',
   },
   email: {
+    color: '#6b7280',
+    marginTop: 2,
+  },
+  phone: {
     color: '#6b7280',
     marginTop: 2,
   },

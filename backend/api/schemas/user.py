@@ -20,19 +20,28 @@ class UserCreate(UserBase):
 
 
 class UserUpdate(BaseModel):
-    """User update schema."""
+    """User update schema (for admin use)."""
     email: Optional[EmailStr] = None
     username: Optional[str] = Field(None, min_length=3, max_length=100)
     is_active: Optional[bool] = None
 
 
+class UserContactUpdate(BaseModel):
+    """User contact info update schema (for self-service)."""
+    full_name: Optional[str] = Field(None, max_length=255)
+    phone: Optional[str] = Field(None, max_length=50)
+
+
 class UserRead(UserBase):
     """User read schema."""
     model_config = ConfigDict(from_attributes=True)
-    
+
     id: UUID
     is_active: bool
     is_premium: bool
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+    profile_picture_url: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
