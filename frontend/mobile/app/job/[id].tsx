@@ -19,6 +19,7 @@ import {
   TextInput,
   ProgressBar,
   SegmentedButtons,
+  FAB,
 } from 'react-native-paper';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -49,6 +50,7 @@ export default function JobDetailsScreen() {
   const [keyPoints, setKeyPoints] = useState<string[]>([]);
   const [coverLetterStyle, setCoverLetterStyle] = useState<CoverLetterStyle>('modern');
   const [expandedQuestion, setExpandedQuestion] = useState<number | null>(null);
+  const [fabOpen, setFabOpen] = useState(false);
 
   // Cover Letter agent
   const coverLetter = useCoverLetter();
@@ -393,9 +395,12 @@ export default function JobDetailsScreen() {
           <View style={styles.salaryResearchHeader}>
             <Ionicons name="cash" size={24} color="#10b981" />
             <View style={styles.salaryResearchHeaderText}>
-              <Text variant="titleMedium" style={styles.sectionTitle}>
-                Salary Insights
-              </Text>
+              <View style={styles.agentTitleRow}>
+                <Text variant="titleMedium" style={styles.sectionTitle}>
+                  Salary Insights
+                </Text>
+                <Chip compact style={styles.aiBadge} textStyle={styles.aiBadgeText}>✨ AI</Chip>
+              </View>
               <Text variant="bodySmall" style={styles.salaryResearchSubtitle}>
                 Research market rates and negotiation tips
               </Text>
@@ -417,9 +422,12 @@ export default function JobDetailsScreen() {
           <View style={styles.skillGapHeader}>
             <Ionicons name="analytics" size={24} color="#8b5cf6" />
             <View style={styles.skillGapHeaderText}>
-              <Text variant="titleMedium" style={styles.sectionTitle}>
-                Skill Gap Analysis
-              </Text>
+              <View style={styles.agentTitleRow}>
+                <Text variant="titleMedium" style={styles.sectionTitle}>
+                  Skill Gap Analysis
+                </Text>
+                <Chip compact style={styles.aiBadge} textStyle={styles.aiBadgeText}>✨ AI</Chip>
+              </View>
               <Text variant="bodySmall" style={styles.skillGapSubtitle}>
                 See how your skills match this role
               </Text>
@@ -441,9 +449,12 @@ export default function JobDetailsScreen() {
           <View style={styles.networkIntelHeader}>
             <Ionicons name="people" size={24} color="#0ea5e9" />
             <View style={styles.networkIntelHeaderText}>
-              <Text variant="titleMedium" style={styles.sectionTitle}>
-                Company Intelligence
-              </Text>
+              <View style={styles.agentTitleRow}>
+                <Text variant="titleMedium" style={styles.sectionTitle}>
+                  Company Intelligence
+                </Text>
+                <Chip compact style={styles.aiBadge} textStyle={styles.aiBadgeText}>✨ AI</Chip>
+              </View>
               <Text variant="bodySmall" style={styles.networkIntelSubtitle}>
                 Research {job.company} and find connections
               </Text>
@@ -465,9 +476,12 @@ export default function JobDetailsScreen() {
           <View style={styles.autoApplyHeader}>
             <Ionicons name="rocket" size={24} color="#8b5cf6" />
             <View style={styles.autoApplyHeaderText}>
-              <Text variant="titleMedium" style={styles.sectionTitle}>
-                Auto-Apply Preparation
-              </Text>
+              <View style={styles.agentTitleRow}>
+                <Text variant="titleMedium" style={styles.sectionTitle}>
+                  Auto-Apply Preparation
+                </Text>
+                <Chip compact style={styles.aiBadge} textStyle={styles.aiBadgeText}>✨ AI</Chip>
+              </View>
               <Text variant="bodySmall" style={styles.autoApplySubtitle}>
                 Get fit assessment and prepared application materials
               </Text>
@@ -490,9 +504,12 @@ export default function JobDetailsScreen() {
             <View style={styles.interviewPrepHeader}>
               <Ionicons name="school" size={24} color="#3b82f6" />
               <View style={styles.interviewPrepHeaderText}>
-                <Text variant="titleMedium" style={styles.sectionTitle}>
-                  Interview Preparation
-                </Text>
+                <View style={styles.agentTitleRow}>
+                  <Text variant="titleMedium" style={styles.sectionTitle}>
+                    Interview Preparation
+                  </Text>
+                  <Chip compact style={styles.aiBadge} textStyle={styles.aiBadgeText}>✨ AI</Chip>
+                </View>
                 <Text variant="bodySmall" style={styles.interviewPrepSubtitle}>
                   Get AI-powered interview questions and tips
                 </Text>
@@ -1593,6 +1610,65 @@ export default function JobDetailsScreen() {
             </Surface>
           </View>
         </View>
+      )}
+
+      {/* AI Agents FAB - hide when any modal is open */}
+      {job && !showProposalModal && !showInterviewPrepModal && !showSalaryModal && !showSkillGapModal && !showNetworkModal && !showAutoApplyModal && (
+        <FAB.Group
+          open={fabOpen}
+          visible
+          icon={fabOpen ? 'close' : 'robot'}
+            actions={[
+              {
+                icon: 'file-document-edit',
+                label: 'Cover Letter',
+                onPress: () => setShowProposalModal(true),
+                color: '#6366f1',
+              },
+              {
+                icon: 'chart-line',
+                label: 'Salary Research',
+                onPress: handleStartSalaryResearch,
+                color: '#10b981',
+              },
+              {
+                icon: 'school',
+                label: 'Skill Gap',
+                onPress: handleStartSkillGap,
+                color: '#8b5cf6',
+              },
+              {
+                icon: 'domain',
+                label: 'Company Intel',
+                onPress: handleStartNetworkIntel,
+                color: '#0ea5e9',
+              },
+              {
+                icon: 'flash',
+                label: 'Auto-Apply',
+                onPress: handleStartAutoApply,
+                color: '#8b5cf6',
+              },
+              ...(existingMatch?.status === 'interviewing'
+                ? [
+                    {
+                      icon: 'briefcase-check',
+                      label: 'Interview Prep',
+                      onPress: handleStartInterviewPrep,
+                      color: '#3b82f6',
+                    },
+                  ]
+                : []),
+            ]}
+            onStateChange={({ open }) => setFabOpen(open)}
+            onPress={() => {
+              if (fabOpen) {
+                // Do something on close if needed
+              }
+            }}
+            fabStyle={styles.fab}
+            style={styles.fabGroup}
+          />
       )}
     </>
   );
@@ -2764,5 +2840,27 @@ const styles = StyleSheet.create({
   screeningAnswer: {
     color: '#6b7280',
     lineHeight: 22,
+  },
+  // AI Badge and FAB styles
+  agentTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  aiBadge: {
+    backgroundColor: '#eef2ff',
+    height: 22,
+  },
+  aiBadgeText: {
+    fontSize: 10,
+    color: '#6366f1',
+    fontWeight: '600',
+  },
+  fab: {
+    backgroundColor: '#6366f1',
+    marginBottom: 80,
+  },
+  fabGroup: {
+    paddingBottom: 0,
   },
 });
