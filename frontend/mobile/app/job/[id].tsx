@@ -25,6 +25,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useJob, useMatchesInfinite, useSaveJob, useUpdateMatchStatus } from '../../src/hooks/useJobs';
 import { useCoverLetter, useInterviewPrep, useSalaryResearch, useSkillGap, useNetworkIntelligence, useAutoApply } from '../../src/hooks/useAgent';
 import { ScoreBreakdownBar } from '../../src/components/ScoreBadge';
+import { AgentLoadingState } from '../../src/components/AgentLoadingState';
 import { matchesApi, proposalsApi } from '../../src/api/client';
 import type { ScoredJob, JobMatchStatus, InterviewQuestion, SalaryRange, SkillGapItem, CoverLetterStyle } from '@jobseeker/shared';
 
@@ -723,17 +724,11 @@ export default function JobDetailsScreen() {
 
               {/* Loading State */}
               {(interviewPrep.isRunning || (interviewPrep.isCompleted && !interviewPrep.result)) && (
-                <View style={styles.interviewPrepLoading}>
-                  <ActivityIndicator size="large" color="#3b82f6" />
-                  <Text variant="bodyMedium" style={styles.interviewPrepLoadingText}>
-                    {interviewPrep.isCompleted ? 'Loading results...' : (interviewPrep.currentStep || 'Preparing interview materials...')}
-                  </Text>
-                  <ProgressBar
-                    progress={interviewPrep.isCompleted ? 1 : interviewPrep.progress / 100}
-                    color="#3b82f6"
-                    style={styles.interviewPrepProgressBar}
-                  />
-                </View>
+                <AgentLoadingState
+                  color="#3b82f6"
+                  progress={interviewPrep.isCompleted ? 1 : interviewPrep.progress / 100}
+                  statusText={interviewPrep.isCompleted ? 'Loading results...' : (interviewPrep.currentStep || 'Preparing interview materials...')}
+                />
               )}
 
               {/* Error State */}
@@ -892,17 +887,11 @@ export default function JobDetailsScreen() {
 
               {/* Loading State */}
               {(salaryResearch.isRunning || (salaryResearch.isCompleted && !salaryResearch.result)) && (
-                <View style={styles.salaryLoading}>
-                  <ActivityIndicator size="large" color="#10b981" />
-                  <Text variant="bodyMedium" style={styles.salaryLoadingText}>
-                    {salaryResearch.isCompleted ? 'Loading results...' : (salaryResearch.currentStep || 'Researching market rates...')}
-                  </Text>
-                  <ProgressBar
-                    progress={salaryResearch.isCompleted ? 1 : salaryResearch.progress / 100}
-                    color="#10b981"
-                    style={styles.salaryProgressBar}
-                  />
-                </View>
+                <AgentLoadingState
+                  color="#10b981"
+                  progress={salaryResearch.isCompleted ? 1 : salaryResearch.progress / 100}
+                  statusText={salaryResearch.isCompleted ? 'Loading results...' : (salaryResearch.currentStep || 'Researching market rates...')}
+                />
               )}
 
               {/* Error State */}
@@ -1076,17 +1065,11 @@ export default function JobDetailsScreen() {
 
               {/* Loading State */}
               {(skillGap.isRunning || (skillGap.isCompleted && !skillGap.result)) && (
-                <View style={styles.skillGapLoading}>
-                  <ActivityIndicator size="large" color="#8b5cf6" />
-                  <Text variant="bodyMedium" style={styles.skillGapLoadingText}>
-                    {skillGap.isCompleted ? 'Loading results...' : (skillGap.currentStep || 'Analyzing your skills...')}
-                  </Text>
-                  <ProgressBar
-                    progress={skillGap.isCompleted ? 1 : skillGap.progress / 100}
-                    color="#8b5cf6"
-                    style={styles.skillGapProgressBar}
-                  />
-                </View>
+                <AgentLoadingState
+                  color="#8b5cf6"
+                  progress={skillGap.isCompleted ? 1 : skillGap.progress / 100}
+                  statusText={skillGap.isCompleted ? 'Loading results...' : (skillGap.currentStep || 'Analyzing your skills...')}
+                />
               )}
 
               {/* Error State */}
@@ -1266,17 +1249,11 @@ export default function JobDetailsScreen() {
 
               {/* Loading State */}
               {(networkIntel.isRunning || (networkIntel.isCompleted && !networkIntel.result)) && (
-                <View style={styles.networkLoading}>
-                  <ActivityIndicator size="large" color="#0ea5e9" />
-                  <Text variant="bodyMedium" style={styles.networkLoadingText}>
-                    {networkIntel.isCompleted ? 'Loading results...' : (networkIntel.currentStep || 'Researching company...')}
-                  </Text>
-                  <ProgressBar
-                    progress={networkIntel.isCompleted ? 1 : networkIntel.progress / 100}
-                    color="#0ea5e9"
-                    style={styles.networkProgressBar}
-                  />
-                </View>
+                <AgentLoadingState
+                  color="#0ea5e9"
+                  progress={networkIntel.isCompleted ? 1 : networkIntel.progress / 100}
+                  statusText={networkIntel.isCompleted ? 'Loading results...' : (networkIntel.currentStep || 'Researching company...')}
+                />
               )}
 
               {/* Error State */}
@@ -1465,17 +1442,11 @@ export default function JobDetailsScreen() {
 
               {/* Loading State */}
               {(autoApply.isRunning || (autoApply.isCompleted && !autoApply.result)) && (
-                <View style={styles.autoApplyLoading}>
-                  <ActivityIndicator size="large" color="#8b5cf6" />
-                  <Text variant="bodyMedium" style={styles.autoApplyLoadingText}>
-                    {autoApply.isCompleted ? 'Loading results...' : (autoApply.currentStep || 'Preparing your application...')}
-                  </Text>
-                  <ProgressBar
-                    progress={autoApply.isCompleted ? 1 : autoApply.progress / 100}
-                    color="#8b5cf6"
-                    style={styles.autoApplyProgressBar}
-                  />
-                </View>
+                <AgentLoadingState
+                  color="#8b5cf6"
+                  progress={autoApply.isCompleted ? 1 : autoApply.progress / 100}
+                  statusText={autoApply.isCompleted ? 'Loading results...' : (autoApply.currentStep || 'Preparing your application...')}
+                />
               )}
 
               {/* Error State */}
@@ -1988,23 +1959,10 @@ const styles = StyleSheet.create({
     width: '92%',
     maxHeight: '85%',
     elevation: 5,
-  },
-  interviewPrepLoading: {
-    padding: 40,
-    alignItems: 'center',
-    gap: 16,
-  },
-  interviewPrepLoadingText: {
-    color: '#3b82f6',
-    textAlign: 'center',
-  },
-  interviewPrepProgressBar: {
-    width: '80%',
-    height: 4,
-    borderRadius: 2,
+    padding: 20,
   },
   interviewPrepError: {
-    padding: 40,
+    paddingVertical: 32,
     alignItems: 'center',
     gap: 16,
   },
@@ -2013,8 +1971,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   interviewPrepContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 8,
   },
   interviewPrepSection2: {
     marginBottom: 20,
@@ -2154,23 +2111,10 @@ const styles = StyleSheet.create({
     width: '92%',
     maxHeight: '85%',
     elevation: 5,
-  },
-  salaryLoading: {
-    padding: 40,
-    alignItems: 'center',
-    gap: 16,
-  },
-  salaryLoadingText: {
-    color: '#10b981',
-    textAlign: 'center',
-  },
-  salaryProgressBar: {
-    width: '80%',
-    height: 4,
-    borderRadius: 2,
+    padding: 20,
   },
   salaryError: {
-    padding: 40,
+    paddingVertical: 32,
     alignItems: 'center',
     gap: 16,
   },
@@ -2179,8 +2123,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   salaryContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 8,
   },
   salarySection: {
     marginBottom: 20,
@@ -2355,23 +2298,10 @@ const styles = StyleSheet.create({
     width: '92%',
     maxHeight: '85%',
     elevation: 5,
-  },
-  skillGapLoading: {
-    padding: 40,
-    alignItems: 'center',
-    gap: 16,
-  },
-  skillGapLoadingText: {
-    color: '#8b5cf6',
-    textAlign: 'center',
-  },
-  skillGapProgressBar: {
-    width: '80%',
-    height: 4,
-    borderRadius: 2,
+    padding: 20,
   },
   skillGapError: {
-    padding: 40,
+    paddingVertical: 32,
     alignItems: 'center',
     gap: 16,
   },
@@ -2380,8 +2310,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   skillGapContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 8,
   },
   skillGapScoreSection: {
     alignItems: 'center',
@@ -2525,24 +2454,10 @@ const styles = StyleSheet.create({
     width: '92%',
     maxHeight: '85%',
     elevation: 5,
-  },
-  networkLoading: {
-    padding: 32,
-    alignItems: 'center',
-  },
-  networkLoadingText: {
-    color: '#0284c7',
-    marginTop: 16,
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  networkProgressBar: {
-    width: '100%',
-    height: 6,
-    borderRadius: 3,
+    padding: 20,
   },
   networkError: {
-    padding: 32,
+    paddingVertical: 32,
     alignItems: 'center',
     gap: 16,
   },
@@ -2551,7 +2466,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   networkContent: {
-    padding: 16,
+    paddingBottom: 8,
     maxHeight: 500,
   },
   networkResultSection: {
@@ -2716,28 +2631,14 @@ const styles = StyleSheet.create({
     maxHeight: '90%',
     borderRadius: 16,
     backgroundColor: '#ffffff',
+    padding: 20,
   },
   autoApplyModalContent: {
     overflow: 'hidden',
     borderRadius: 16,
   },
-  autoApplyLoading: {
-    padding: 40,
-    alignItems: 'center',
-  },
-  autoApplyLoadingText: {
-    marginTop: 16,
-    color: '#7c3aed',
-    textAlign: 'center',
-  },
-  autoApplyProgressBar: {
-    width: '80%',
-    height: 4,
-    marginTop: 16,
-    borderRadius: 2,
-  },
   autoApplyError: {
-    padding: 40,
+    paddingVertical: 32,
     alignItems: 'center',
     gap: 16,
   },
@@ -2747,7 +2648,7 @@ const styles = StyleSheet.create({
   },
   autoApplyContent: {
     maxHeight: 500,
-    padding: 16,
+    paddingBottom: 8,
   },
   autoApplyResultSection: {
     marginBottom: 24,
