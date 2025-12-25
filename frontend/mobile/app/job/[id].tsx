@@ -18,7 +18,7 @@ import {
   Surface,
   TextInput,
   ProgressBar,
-  SegmentedButtons,
+  Menu,
   FAB,
 } from 'react-native-paper';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
@@ -49,6 +49,7 @@ export default function JobDetailsScreen() {
   const [proposal, setProposal] = useState('');
   const [keyPoints, setKeyPoints] = useState<string[]>([]);
   const [coverLetterStyle, setCoverLetterStyle] = useState<CoverLetterStyle>('modern');
+  const [styleMenuVisible, setStyleMenuVisible] = useState(false);
   const [expandedQuestion, setExpandedQuestion] = useState<number | null>(null);
   const [fabOpen, setFabOpen] = useState(false);
 
@@ -349,6 +350,20 @@ export default function JobDetailsScreen() {
                 />
               ))}
             </View>
+            {/* Why This Matches - personalized explanation */}
+            {scoredJob.explanation && (
+              <View style={styles.explanationBox}>
+                <View style={styles.explanationHeader}>
+                  <Ionicons name="sparkles" size={16} color="#8b5cf6" />
+                  <Text variant="labelMedium" style={styles.explanationTitle}>
+                    Why This Matches You
+                  </Text>
+                </View>
+                <Text variant="bodySmall" style={styles.explanationText}>
+                  {scoredJob.explanation}
+                </Text>
+              </View>
+            )}
           </Surface>
         )}
 
@@ -638,17 +653,42 @@ export default function JobDetailsScreen() {
                     <Text variant="labelMedium" style={styles.toneSelectorLabel}>
                       Style
                     </Text>
-                    <SegmentedButtons
-                      value={coverLetterStyle}
-                      onValueChange={(value) => setCoverLetterStyle(value as CoverLetterStyle)}
-                      buttons={[
-                        { value: 'modern', label: 'Modern' },
-                        { value: 'traditional', label: 'Traditional' },
-                        { value: 'creative', label: 'Creative' },
-                        { value: 'executive', label: 'Executive' },
-                      ]}
-                      style={styles.segmentedButtons}
-                    />
+                    <Menu
+                      visible={styleMenuVisible}
+                      onDismiss={() => setStyleMenuVisible(false)}
+                      anchor={
+                        <Button
+                          mode="outlined"
+                          onPress={() => setStyleMenuVisible(true)}
+                          icon="chevron-down"
+                          contentStyle={styles.styleDropdownContent}
+                          style={styles.styleDropdown}
+                        >
+                          {coverLetterStyle.charAt(0).toUpperCase() + coverLetterStyle.slice(1)}
+                        </Button>
+                      }
+                    >
+                      <Menu.Item
+                        onPress={() => { setCoverLetterStyle('modern'); setStyleMenuVisible(false); }}
+                        title="Modern"
+                        leadingIcon={coverLetterStyle === 'modern' ? 'check' : undefined}
+                      />
+                      <Menu.Item
+                        onPress={() => { setCoverLetterStyle('traditional'); setStyleMenuVisible(false); }}
+                        title="Traditional"
+                        leadingIcon={coverLetterStyle === 'traditional' ? 'check' : undefined}
+                      />
+                      <Menu.Item
+                        onPress={() => { setCoverLetterStyle('creative'); setStyleMenuVisible(false); }}
+                        title="Creative"
+                        leadingIcon={coverLetterStyle === 'creative' ? 'check' : undefined}
+                      />
+                      <Menu.Item
+                        onPress={() => { setCoverLetterStyle('executive'); setStyleMenuVisible(false); }}
+                        title="Executive"
+                        leadingIcon={coverLetterStyle === 'executive' ? 'check' : undefined}
+                      />
+                    </Menu>
                   </View>
 
                   {/* Progress/Status */}
@@ -1801,6 +1841,28 @@ const styles = StyleSheet.create({
   scoreBreakdown: {
     gap: 12,
   },
+  explanationBox: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: '#f5f3ff',
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#8b5cf6',
+  },
+  explanationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  explanationTitle: {
+    color: '#6d28d9',
+    fontWeight: '600',
+  },
+  explanationText: {
+    color: '#4b5563',
+    lineHeight: 20,
+  },
   skillsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1924,8 +1986,11 @@ const styles = StyleSheet.create({
     color: '#374151',
     marginBottom: 8,
   },
-  segmentedButtons: {
-    width: '100%',
+  styleDropdown: {
+    minWidth: 140,
+  },
+  styleDropdownContent: {
+    flexDirection: 'row-reverse',
   },
   // Progress styles
   progressContainer: {

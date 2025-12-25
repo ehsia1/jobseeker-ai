@@ -29,7 +29,7 @@ class MatchingService:
         self,
         user_id: str,
         limit: int = 20,
-        min_score: float = 70.0,
+        min_score: float = 40.0,
         days_back: int = 7
     ) -> List[JobMatch]:
         """

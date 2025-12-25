@@ -218,10 +218,12 @@ async def score_jobs(job_ids: List[str], user_id: str) -> Dict[str, Any]:
                         "job_id": job_id,
                         "title": job.title,
                         "company": job.company,
+                        "location": job.location,
+                        "remote": job.remote,
                         "total_score": score_breakdown.total_score,
                         "score_breakdown": score_breakdown.to_dict(),
                         "explanation": explanation,
-                        "recommended": score_breakdown.total_score >= 70
+                        "recommended": score_breakdown.total_score >= 40
                     })
             
             # Sort by score

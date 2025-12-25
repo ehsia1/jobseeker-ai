@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     
     # Redis
     redis_url: str = Field(env="REDIS_URL")
+
+    # Celery eager mode (runs tasks synchronously without Redis - for local dev)
+    celery_eager_mode: bool = Field(default=False, env="CELERY_EAGER_MODE")
     
     # ChromaDB
     chroma_host: str = Field(default="localhost", env="CHROMA_HOST")

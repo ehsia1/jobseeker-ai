@@ -74,10 +74,19 @@ async def update_user_profile(
     update_data = profile_data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(profile, field, value)
-    
+
     await db.commit()
     await db.refresh(profile)
-    
+
+    # Trigger background tasks: recalculate matches, find new matches
+    try:
+        from backend.workers.agent_tasks import on_profile_updated
+        on_profile_updated(str(current_user.id))
+        logger.info(f"Triggered profile update workflow for user {current_user.id}")
+    except Exception as e:
+        # Don't fail the request if background tasks fail to queue
+        logger.warning(f"Failed to trigger profile update workflow: {e}")
+
     return profile
 
 

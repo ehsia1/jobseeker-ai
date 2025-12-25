@@ -44,7 +44,7 @@ async def generate_matches(
 @router.post("/generate-sync")
 async def generate_matches_sync(
     limit: int = Query(20, ge=1, le=100),
-    min_score: float = Query(70.0, ge=0, le=100),
+    min_score: float = Query(40.0, ge=0, le=100),
     current_user: User = Depends(get_current_user),
     subscription: Optional[Subscription] = Depends(require_job_search),
     db: AsyncSession = Depends(get_db)

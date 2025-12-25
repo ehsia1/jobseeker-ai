@@ -37,7 +37,7 @@ async def generate_matches_for_user_task(self, user_id: str):
             matches = await matching_service.generate_matches_for_user(
                 user_id=user_id,
                 limit=30,
-                min_score=70.0,
+                min_score=40.0,
                 days_back=7
             )
             

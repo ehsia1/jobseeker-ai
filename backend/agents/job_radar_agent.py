@@ -217,7 +217,7 @@ class JobRadarAgent:
         """Filter top matches based on scores."""
         logger.info("Filtering top matches")
 
-        min_score = state.get("min_score", 70.0)
+        min_score = state.get("min_score", 40.0)
 
         try:
             # Get jobs with score >= min_score
@@ -314,7 +314,7 @@ class JobRadarAgent:
         keywords: Optional[List[str]] = None,
         profession: Optional[str] = None,
         remote_only: bool = True,
-        min_score: float = 70.0,
+        min_score: float = 40.0,
         generate_proposals: bool = True,
         max_proposals: int = 5
     ) -> Dict[str, Any]:

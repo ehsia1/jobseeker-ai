@@ -443,20 +443,25 @@ export default function JobFeedScreen() {
                     style={styles.matchItem}
                     onPress={() => handleRadarJobPress(item)}
                   >
-                    <View style={styles.matchInfo}>
+                    <View style={styles.matchHeader}>
                       <Text variant="bodyLarge" style={styles.matchTitle} numberOfLines={1}>
                         {item.title}
                       </Text>
-                      <Text variant="bodySmall" style={styles.matchCompany} numberOfLines={1}>
-                        {item.company} {item.location && `• ${item.location}`}
-                        {item.remote && ' • Remote'}
-                      </Text>
+                      <View style={styles.matchScore}>
+                        <Text variant="labelMedium" style={styles.scoreText}>
+                          {item.score}%
+                        </Text>
+                      </View>
                     </View>
-                    <View style={styles.matchScore}>
-                      <Text variant="titleMedium" style={styles.scoreText}>
-                        {item.score}%
+                    <Text variant="bodySmall" style={styles.matchCompany} numberOfLines={1}>
+                      {item.company} {item.location && `• ${item.location}`}
+                      {item.remote && ' • Remote'}
+                    </Text>
+                    {item.explanation && (
+                      <Text variant="bodySmall" style={styles.matchExplanation} numberOfLines={3}>
+                        {item.explanation}
                       </Text>
-                    </View>
+                    )}
                   </TouchableOpacity>
                 )}
                 ListEmptyComponent={
@@ -716,28 +721,35 @@ const styles = StyleSheet.create({
     maxHeight: 400,
   },
   matchItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#f3f4f6',
   },
-  matchInfo: {
-    flex: 1,
+  matchHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   matchTitle: {
+    flex: 1,
     color: '#111827',
     fontWeight: '500',
   },
   matchCompany: {
     color: '#6b7280',
-    marginTop: 2,
+    marginTop: 4,
+  },
+  matchExplanation: {
+    color: '#059669',
+    marginTop: 8,
+    lineHeight: 18,
+    fontStyle: 'italic',
   },
   matchScore: {
     backgroundColor: '#dbeafe',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
     marginLeft: 12,
   },
   scoreText: {

@@ -18,6 +18,7 @@ import {
   Surface,
   Avatar,
   IconButton,
+  Menu,
 } from 'react-native-paper';
 import { useRouter, Stack } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
@@ -39,6 +40,28 @@ function formatPhoneNumber(value: string): string {
   if (limited.length <= 6) return `(${limited.slice(0, 3)}) ${limited.slice(3)}`;
   return `(${limited.slice(0, 3)}) ${limited.slice(3, 6)}-${limited.slice(6)}`;
 }
+
+// Common skills for suggestions
+const COMMON_SKILLS = [
+  // Programming Languages
+  'JavaScript', 'TypeScript', 'Python', 'Java', 'C++', 'C#', 'Go', 'Rust', 'Ruby', 'PHP', 'Swift', 'Kotlin',
+  // Frontend
+  'React', 'React Native', 'Vue.js', 'Angular', 'Next.js', 'HTML', 'CSS', 'Tailwind CSS', 'SASS',
+  // Backend
+  'Node.js', 'Express', 'FastAPI', 'Django', 'Flask', 'Spring Boot', 'ASP.NET', 'GraphQL', 'REST API',
+  // Databases
+  'PostgreSQL', 'MySQL', 'MongoDB', 'Redis', 'SQLite', 'DynamoDB', 'Elasticsearch',
+  // Cloud & DevOps
+  'AWS', 'Azure', 'Google Cloud', 'Docker', 'Kubernetes', 'Terraform', 'CI/CD', 'Jenkins', 'GitHub Actions',
+  // Data & AI
+  'Machine Learning', 'TensorFlow', 'PyTorch', 'Data Analysis', 'SQL', 'Pandas', 'NumPy', 'Spark',
+  // Design
+  'UI/UX Design', 'Figma', 'Adobe XD', 'Sketch', 'Photoshop', 'Illustrator',
+  // Project Management
+  'Agile', 'Scrum', 'Jira', 'Product Management', 'Project Management',
+  // Soft Skills
+  'Leadership', 'Communication', 'Problem Solving', 'Team Collaboration', 'Time Management',
+];
 
 // Get full avatar URL from relative path
 function getAvatarUrl(profilePictureUrl: string | null | undefined): string | null {
@@ -67,6 +90,7 @@ export default function EditProfileScreen() {
   const [profession, setProfession] = useState('');
   const [skills, setSkills] = useState<string[]>([]);
   const [newSkill, setNewSkill] = useState('');
+  const [skillSuggestionsVisible, setSkillSuggestionsVisible] = useState(false);
   const [experienceYears, setExperienceYears] = useState('');
   const [minRate, setMinRate] = useState('');
   const [remoteOnly, setRemoteOnly] = useState(false);
@@ -97,8 +121,26 @@ export default function EditProfileScreen() {
     if (skill && !skills.includes(skill)) {
       setSkills([...skills, skill]);
       setNewSkill('');
+      setSkillSuggestionsVisible(false);
     }
   };
+
+  const handleSelectSuggestion = (skill: string) => {
+    if (!skills.includes(skill)) {
+      setSkills([...skills, skill]);
+    }
+    setNewSkill('');
+    setSkillSuggestionsVisible(false);
+  };
+
+  // Filter suggestions based on input - show matches that aren't already added
+  const filteredSuggestions = newSkill.trim().length > 0
+    ? COMMON_SKILLS.filter(
+        (skill) =>
+          skill.toLowerCase().includes(newSkill.toLowerCase()) &&
+          !skills.includes(skill)
+      ).slice(0, 6) // Limit to 6 suggestions
+    : [];
 
   const handleRemoveSkill = (skillToRemove: string) => {
     setSkills(skills.filter((s) => s !== skillToRemove));
@@ -320,15 +362,38 @@ export default function EditProfileScreen() {
               Skills
             </Text>
             <View style={styles.skillInputRow}>
-              <TextInput
-                label="Add a skill"
-                value={newSkill}
-                onChangeText={setNewSkill}
-                mode="outlined"
-                placeholder="e.g., React, Python"
-                style={styles.skillInput}
-                onSubmitEditing={handleAddSkill}
-              />
+              <View style={styles.skillInputWrapper}>
+                <Menu
+                  visible={skillSuggestionsVisible && filteredSuggestions.length > 0}
+                  onDismiss={() => setSkillSuggestionsVisible(false)}
+                  anchorPosition="bottom"
+                  anchor={
+                    <TextInput
+                      label="Add a skill"
+                      value={newSkill}
+                      onChangeText={(text) => {
+                        setNewSkill(text);
+                        setSkillSuggestionsVisible(text.trim().length > 0);
+                      }}
+                      mode="outlined"
+                      placeholder="e.g., React, Python"
+                      style={styles.skillInput}
+                      onSubmitEditing={handleAddSkill}
+                      onFocus={() => setSkillSuggestionsVisible(newSkill.trim().length > 0)}
+                    />
+                  }
+                  contentStyle={styles.suggestionsMenu}
+                >
+                  {filteredSuggestions.map((suggestion) => (
+                    <Menu.Item
+                      key={suggestion}
+                      onPress={() => handleSelectSuggestion(suggestion)}
+                      title={suggestion}
+                      dense
+                    />
+                  ))}
+                </Menu>
+              </View>
               <Button
                 mode="contained"
                 onPress={handleAddSkill}
@@ -481,8 +546,13 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 12,
   },
-  skillInput: {
+  skillInputWrapper: {
     flex: 1,
+  },
+  skillInput: {
+    backgroundColor: '#fff',
+  },
+  suggestionsMenu: {
     backgroundColor: '#fff',
   },
   addButton: {

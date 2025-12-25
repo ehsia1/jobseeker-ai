@@ -23,12 +23,17 @@ celery_app.conf.update(
     worker_prefetch_multiplier=1,
     task_acks_late=True,
     worker_max_tasks_per_child=1000,
+
+    # Eager mode: run tasks synchronously without broker (for local dev)
+    task_always_eager=settings.celery_eager_mode,
+    task_eager_propagates=settings.celery_eager_mode,
     
     # Task routing
     task_routes={
         "backend.workers.job_ingestion.*": {"queue": "ingestion"},
         "backend.workers.job_matching.*": {"queue": "matching"},
         "backend.workers.notifications.*": {"queue": "notifications"},
+        "backend.workers.agent_tasks.*": {"queue": "agents"},
     },
     
     # Periodic tasks
@@ -62,13 +67,26 @@ celery_app.conf.update(
             "task": "backend.workers.maintenance.cleanup_old_jobs_task",
             "schedule": crontab(day_of_week=0, hour=2, minute=0),  # Sunday 2 AM
         },
+
+        # Run Job Radar for all users daily at 8 AM (before daily matches)
+        "daily-job-radar": {
+            "task": "backend.workers.agent_tasks.run_job_radar_for_all_task",
+            "schedule": crontab(hour=8, minute=0),
+        },
+
+        # Run Job Radar again at 6 PM for evening job hunters
+        "evening-job-radar": {
+            "task": "backend.workers.agent_tasks.run_job_radar_for_all_task",
+            "schedule": crontab(hour=18, minute=0),
+        },
     },
 )
 
 # Auto-discover tasks
 celery_app.autodiscover_tasks([
     "backend.workers.job_ingestion",
-    "backend.workers.job_matching", 
+    "backend.workers.job_matching",
     "backend.workers.notifications",
     "backend.workers.maintenance",
+    "backend.workers.agent_tasks",
 ])

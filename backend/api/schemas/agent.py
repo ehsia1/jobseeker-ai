@@ -29,7 +29,7 @@ class AgentRunRequest(BaseModel):
         description="Only search for remote jobs"
     )
     min_score: float = Field(
-        default=70.0,
+        default=40.0,
         ge=0,
         le=100,
         description="Minimum match score threshold"

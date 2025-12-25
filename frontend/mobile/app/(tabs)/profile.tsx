@@ -357,7 +357,7 @@ export default function ProfileScreen() {
 
             <Divider />
             <View style={styles.resumeActions}>
-              <Button mode="outlined" onPress={handleViewResume} style={styles.resumeButton}>
+              <Button mode="outlined" onPress={handleViewResume} style={styles.resumeButton} icon="eye">
                 View
               </Button>
               <Button
@@ -365,6 +365,7 @@ export default function ProfileScreen() {
                 onPress={handleUploadResume}
                 style={styles.resumeButton}
                 loading={uploadResume.isPending}
+                icon="cloud-upload"
               >
                 Replace
               </Button>
@@ -400,17 +401,38 @@ export default function ProfileScreen() {
           </View>
         ) : (
           <View style={styles.noResume}>
+            <Ionicons name="document-text-outline" size={48} color="#9ca3af" style={{ marginBottom: 12 }} />
             <Text variant="bodyMedium" style={styles.noResumeText}>
-              No resume uploaded
+              No resume uploaded yet
             </Text>
-            <Button
-              mode="contained"
-              onPress={handleUploadResume}
-              icon="upload"
-              loading={uploadResume.isPending}
-            >
-              Upload Resume
-            </Button>
+            <Text variant="bodySmall" style={styles.noResumeHint}>
+              Upload from your device, Google Drive, iCloud, or Dropbox
+            </Text>
+            <View style={styles.uploadOptions}>
+              <Button
+                mode="contained"
+                onPress={handleUploadResume}
+                icon="cloud-upload"
+                loading={uploadResume.isPending}
+                style={styles.uploadButton}
+              >
+                Upload Resume
+              </Button>
+              <Button
+                mode="outlined"
+                onPress={() => setPasteTextModalVisible(true)}
+                icon="text-box-outline"
+                style={styles.pasteButton}
+              >
+                Paste Text
+              </Button>
+            </View>
+            <View style={styles.supportedFormats}>
+              <Ionicons name="information-circle-outline" size={14} color="#9ca3af" />
+              <Text variant="bodySmall" style={styles.supportedFormatsText}>
+                Supports PDF, DOC, DOCX (max 10MB)
+              </Text>
+            </View>
           </View>
         )}
       </Card>
@@ -744,12 +766,37 @@ const styles = StyleSheet.create({
     marginVertical: 8,
   },
   noResume: {
-    padding: 16,
+    padding: 20,
     alignItems: 'center',
   },
   noResumeText: {
+    color: '#374151',
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  noResumeHint: {
     color: '#6b7280',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  uploadOptions: {
+    flexDirection: 'row',
+    gap: 12,
     marginBottom: 12,
+  },
+  uploadButton: {
+    flex: 1,
+  },
+  pasteButton: {
+    flex: 1,
+  },
+  supportedFormats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  supportedFormatsText: {
+    color: '#9ca3af',
   },
   resumeActions: {
     flexDirection: 'row',

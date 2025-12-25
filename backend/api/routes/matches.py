@@ -1,16 +1,21 @@
 """Job matching routes."""
 
 from typing import List
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, desc
 from sqlalchemy.orm import selectinload
 
 from backend.database import get_db
-from backend.models.user import User
+from backend.models.user import User, UserProfile
 from backend.models.job import Job, JobMatch
 from backend.api.schemas.match import JobMatchRead
 from backend.api.routes.auth import get_current_user
+from backend.services.scoring_service import ScoringService
+from backend.services.embedding_service import EmbeddingService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -68,14 +73,40 @@ async def create_match(
     if existing_match:
         return existing_match
 
-    # Create new match
+    # Get user profile for scoring
+    profile_result = await db.execute(
+        select(UserProfile).where(UserProfile.user_id == current_user.id)
+    )
+    profile = profile_result.scalar_one_or_none()
+
+    # Calculate score using scoring service
+    score = 50.0  # Default fallback score
+    score_breakdown = {}
+    explanation = None
+
+    if profile:
+        try:
+            embedding_service = EmbeddingService()
+            scoring_service = ScoringService(embedding_service)
+            breakdown = scoring_service.score_job(job, profile)
+            score = breakdown.total_score
+            score_breakdown = breakdown.to_dict()
+            explanation = scoring_service.generate_explanation(job, profile, breakdown)
+            logger.info(f"Calculated score {score:.1f} for job {job.title}")
+        except Exception as e:
+            logger.warning(f"Error calculating score: {e}, using default")
+    else:
+        logger.warning(f"No profile found for user {current_user.id}, using default score")
+
+    # Create new match with calculated score
     match = JobMatch(
         id=uuid.uuid4(),
         user_id=current_user.id,
         job_id=job_uuid,
         status="new",
-        score=70.0,  # Default score, would be calculated by scoring service
-        score_breakdown={},
+        score=score,
+        score_breakdown=score_breakdown,
+        explanation=explanation,
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow(),
     )
@@ -96,7 +127,7 @@ async def create_match(
 @router.get("/", response_model=List[JobMatchRead])
 async def get_user_matches(
     status_filter: str = Query(None, pattern="^(new|viewed|saved|applied|rejected)$"),
-    min_score: float = Query(70.0, ge=0, le=100),
+    min_score: float = Query(40.0, ge=0, le=100),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
     current_user: User = Depends(get_current_user),

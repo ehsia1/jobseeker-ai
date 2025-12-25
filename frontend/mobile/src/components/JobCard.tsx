@@ -117,6 +117,16 @@ export default function JobCard({ job, onPress, onSave, onApply, compact = false
           </View>
         )}
 
+        {/* Why this matches - brief explanation for scored jobs */}
+        {!compact && scored && job.explanation && (
+          <View style={styles.explanationPreview}>
+            <Ionicons name="sparkles" size={12} color="#8b5cf6" />
+            <Text variant="bodySmall" style={styles.explanationText} numberOfLines={2}>
+              {job.explanation}
+            </Text>
+          </View>
+        )}
+
         {/* Footer */}
         {!compact && (
           <View style={styles.footer}>
@@ -237,5 +247,21 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     padding: 4,
+  },
+  explanationPreview: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    marginBottom: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    backgroundColor: '#f5f3ff',
+    borderRadius: 6,
+  },
+  explanationText: {
+    flex: 1,
+    color: '#6d28d9',
+    fontSize: 12,
+    lineHeight: 16,
   },
 });

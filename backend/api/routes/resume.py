@@ -220,6 +220,15 @@ async def upload_resume(
 
         await db.commit()
 
+        # Trigger background tasks: sync profile, recalculate matches, find new matches
+        try:
+            from backend.workers.agent_tasks import on_resume_updated
+            on_resume_updated(str(current_user.id))
+            logger.info(f"Triggered resume update workflow for user {current_user.id}")
+        except Exception as e:
+            # Don't fail the request if background tasks fail to queue
+            logger.warning(f"Failed to trigger resume update workflow: {e}")
+
         return ResumeUploadResponse(
             message="Resume uploaded and parsed successfully",
             resume=_resume_to_response(resume),
@@ -255,6 +264,15 @@ async def parse_resume_text(
         )
 
         await db.commit()
+
+        # Trigger background tasks: sync profile, recalculate matches, find new matches
+        try:
+            from backend.workers.agent_tasks import on_resume_updated
+            on_resume_updated(str(current_user.id))
+            logger.info(f"Triggered resume update workflow for user {current_user.id}")
+        except Exception as e:
+            # Don't fail the request if background tasks fail to queue
+            logger.warning(f"Failed to trigger resume update workflow: {e}")
 
         return ResumeUploadResponse(
             message="Resume parsed successfully",
@@ -358,6 +376,15 @@ async def reparse_resume(
 
         await db.commit()
         await db.refresh(reparsed)
+
+        # Trigger background tasks: sync profile, recalculate matches, find new matches
+        try:
+            from backend.workers.agent_tasks import on_resume_updated
+            on_resume_updated(str(current_user.id))
+            logger.info(f"Triggered resume update workflow for user {current_user.id}")
+        except Exception as e:
+            # Don't fail the request if background tasks fail to queue
+            logger.warning(f"Failed to trigger resume update workflow: {e}")
 
         return ResumeUploadResponse(
             message="Resume re-parsed successfully with updated logic",
