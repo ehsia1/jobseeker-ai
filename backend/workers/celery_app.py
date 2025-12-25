@@ -79,6 +79,12 @@ celery_app.conf.update(
             "task": "backend.workers.agent_tasks.run_job_radar_for_all_task",
             "schedule": crontab(hour=18, minute=0),
         },
+
+        # Run Application Tracker briefing daily at 9:30 AM (after daily matches)
+        "daily-tracker-briefing": {
+            "task": "backend.workers.agent_tasks.run_application_tracker_for_all_task",
+            "schedule": crontab(hour=9, minute=30),
+        },
     },
 )
 

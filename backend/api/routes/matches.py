@@ -249,6 +249,16 @@ async def update_match_status(
     await db.commit()
     await db.refresh(match)
 
+    # Trigger cover letter pre-generation when job is saved
+    if new_status == "saved":
+        try:
+            from backend.workers.agent_tasks import on_job_saved
+            on_job_saved(str(current_user.id), str(match.job_id))
+            logger.info(f"Triggered cover letter pre-generation for job {match.job_id}")
+        except Exception as e:
+            # Don't fail the request if background task fails to queue
+            logger.warning(f"Failed to trigger cover letter generation: {e}")
+
     return match
 
 
