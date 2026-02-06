@@ -41,19 +41,19 @@ class GitHubJobsSearcher(BaseJobSearcher):
     async def search(self, query: SearchQuery) -> List[SearchResult]:
         """Search GitHub for job postings."""
         results = []
-        
+
         try:
             # Build search query for GitHub
             search_terms = []
-            
+
             if query.keywords:
                 search_terms.extend(query.keywords)
-            
+
             if query.remote_only:
                 search_terms.append("remote")
-            
+
             search_query = " ".join(search_terms) if search_terms else "hiring"
-            
+
             # Search in issues
             params = {
                 "q": f"{search_query} is:issue is:open label:hiring,job,jobs,career in:title,body",
@@ -61,20 +61,26 @@ class GitHubJobsSearcher(BaseJobSearcher):
                 "order": "desc",
                 "per_page": min(query.limit, 100)
             }
-            
-            async with self.session.get(f"{self.base_url}/search/issues", params=params) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    items = data.get('items', [])
-                    
-                    for item in items:
-                        result = self._parse_issue(item, query)
-                        if result:
-                            results.append(result)
-                elif response.status == 403:
-                    logger.warning("GitHub API rate limit reached")
-                else:
-                    logger.error(f"GitHub API returned status {response.status}")
+
+            headers = {
+                "Accept": "application/vnd.github.v3+json",
+                "User-Agent": "JobSeeker AI Bot"
+            }
+
+            async with aiohttp.ClientSession(headers=headers) as session:
+                async with session.get(f"{self.base_url}/search/issues", params=params) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        items = data.get('items', [])
+
+                        for item in items:
+                            result = self._parse_issue(item, query)
+                            if result:
+                                results.append(result)
+                    elif response.status == 403:
+                        logger.warning("GitHub API rate limit reached")
+                    else:
+                        logger.error(f"GitHub API returned status {response.status}")
             
             logger.info(f"Found {len(results)} jobs on GitHub")
             

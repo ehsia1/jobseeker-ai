@@ -14,8 +14,7 @@ class LinkedInSearcher(BaseJobSearcher):
     """Searcher for LinkedIn jobs - all professions."""
     
     def __init__(self):
-        super().__init__()
-        self.source_name = "LinkedIn"
+        super().__init__("LinkedIn")
         # LinkedIn requires OAuth and API access
         self.base_url = "https://api.linkedin.com/v2/jobs"
         

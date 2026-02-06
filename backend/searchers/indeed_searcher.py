@@ -15,8 +15,7 @@ class IndeedSearcher(BaseJobSearcher):
     """Searcher for Indeed job board - supports all professions."""
     
     def __init__(self):
-        super().__init__()
-        self.source_name = "Indeed"
+        super().__init__("Indeed")
         # Note: Indeed requires API access or web scraping
         # This is a simplified implementation
         self.base_url = "https://api.indeed.com/ads/apisearch"

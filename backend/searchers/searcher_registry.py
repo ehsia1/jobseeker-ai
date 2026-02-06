@@ -20,6 +20,30 @@ from backend.searchers.healthcareers_searcher import HealthCareersSearcher
 from backend.searchers.lawjobs_searcher import LawJobsSearcher
 from backend.searchers.efinancialcareers_searcher import EFinancialCareersSearcher
 
+# General job boards
+from backend.searchers.glassdoor_searcher import GlassdoorSearcher
+from backend.searchers.ziprecruiter_searcher import ZipRecruiterSearcher
+from backend.searchers.monster_searcher import MonsterSearcher
+from backend.searchers.simplyhired_searcher import SimplyHiredSearcher
+
+# Remote-focused job boards
+from backend.searchers.weworkremotely_searcher import WeWorkRemotelySearcher
+from backend.searchers.remoteco_searcher import RemoteCoSearcher
+from backend.searchers.workingnomads_searcher import WorkingNomadsSearcher
+from backend.searchers.jobspresso_searcher import JobspressoSearcher
+
+# Industry-specific additional searchers
+from backend.searchers.higheredjobs_searcher import HigherEdJobsSearcher
+from backend.searchers.usajobs_searcher import USAJobsSearcher
+from backend.searchers.idealist_searcher import IdealistSearcher
+from backend.searchers.mediabistro_searcher import MediabistroSearcher
+from backend.searchers.behance_searcher import BehanceSearcher
+
+# Freelance platforms
+from backend.searchers.fiverr_searcher import FiverrSearcher
+from backend.searchers.freelancer_searcher import FreelancerSearcher
+from backend.searchers.toptal_searcher import ToptalSearcher
+
 logger = logging.getLogger(__name__)
 
 
@@ -37,6 +61,11 @@ class SearcherRegistry:
             AngelListSearcher,
             IndeedSearcher,
             LinkedInSearcher,
+            GlassdoorSearcher,
+            ZipRecruiterSearcher,
+            WeWorkRemotelySearcher,
+            WorkingNomadsSearcher,
+            ToptalSearcher,
         ],
         "data_scientist": [
             DiceSearcher,
@@ -45,6 +74,9 @@ class SearcherRegistry:
             AngelListSearcher,
             IndeedSearcher,
             LinkedInSearcher,
+            GlassdoorSearcher,
+            WeWorkRemotelySearcher,
+            ToptalSearcher,
         ],
         "devops": [
             DiceSearcher,
@@ -53,6 +85,10 @@ class SearcherRegistry:
             GitHubJobsSearcher,
             IndeedSearcher,
             LinkedInSearcher,
+            GlassdoorSearcher,
+            WeWorkRemotelySearcher,
+            WorkingNomadsSearcher,
+            ToptalSearcher,
         ],
         "product_manager": [
             AngelListSearcher,
@@ -60,17 +96,25 @@ class SearcherRegistry:
             IndeedSearcher,
             LinkedInSearcher,
             FlexJobsSearcher,
+            GlassdoorSearcher,
+            ZipRecruiterSearcher,
+            WeWorkRemotelySearcher,
+            ToptalSearcher,
         ],
-        
+
         # Creative roles
         "designer": [
             DribbbleSearcher,  # Design-focused job board
+            BehanceSearcher,  # Adobe creative network
             AngelListSearcher,
             RemoteOKSearcher,
             FlexJobsSearcher,
             UpworkSearcher,
             IndeedSearcher,
             LinkedInSearcher,
+            WeWorkRemotelySearcher,
+            FiverrSearcher,
+            ToptalSearcher,
         ],
         "writer": [
             FlexJobsSearcher,
@@ -78,14 +122,22 @@ class SearcherRegistry:
             RemoteOKSearcher,
             IndeedSearcher,
             LinkedInSearcher,
+            MediabistroSearcher,
+            RemoteCoSearcher,
+            JobspressoSearcher,
+            FiverrSearcher,
+            FreelancerSearcher,
         ],
         "content_creator": [
             FlexJobsSearcher,
             UpworkSearcher,
             RemoteOKSearcher,
             IndeedSearcher,
+            MediabistroSearcher,
+            FiverrSearcher,
+            FreelancerSearcher,
         ],
-        
+
         # Business roles
         "sales": [
             AngelListSearcher,
@@ -93,6 +145,10 @@ class SearcherRegistry:
             IndeedSearcher,
             LinkedInSearcher,
             FlexJobsSearcher,
+            GlassdoorSearcher,
+            ZipRecruiterSearcher,
+            MonsterSearcher,
+            WeWorkRemotelySearcher,
         ],
         "marketing": [
             AngelListSearcher,
@@ -100,26 +156,39 @@ class SearcherRegistry:
             FlexJobsSearcher,
             IndeedSearcher,
             LinkedInSearcher,
+            MediabistroSearcher,
+            GlassdoorSearcher,
+            WeWorkRemotelySearcher,
+            JobspressoSearcher,
         ],
         "business_analyst": [
             IndeedSearcher,
             LinkedInSearcher,
             AngelListSearcher,
             FlexJobsSearcher,
+            GlassdoorSearcher,
+            ZipRecruiterSearcher,
         ],
-        
+
         # Operations & Admin
         "operations": [
             AngelListSearcher,
             IndeedSearcher,
             LinkedInSearcher,
             FlexJobsSearcher,
+            GlassdoorSearcher,
+            ZipRecruiterSearcher,
+            MonsterSearcher,
         ],
         "admin": [
             FlexJobsSearcher,
             IndeedSearcher,
             LinkedInSearcher,
             UpworkSearcher,
+            ZipRecruiterSearcher,
+            MonsterSearcher,
+            SimplyHiredSearcher,
+            RemoteCoSearcher,
         ],
         "project_manager": [
             IndeedSearcher,
@@ -127,8 +196,10 @@ class SearcherRegistry:
             AngelListSearcher,
             FlexJobsSearcher,
             RemoteOKSearcher,
+            GlassdoorSearcher,
+            ToptalSearcher,
         ],
-        
+
         # Finance & Accounting
         "accountant": [
             EFinancialCareersSearcher,  # Finance-focused job board
@@ -136,76 +207,104 @@ class SearcherRegistry:
             LinkedInSearcher,
             FlexJobsSearcher,
             UpworkSearcher,
+            GlassdoorSearcher,
+            ZipRecruiterSearcher,
+            MonsterSearcher,
         ],
         "finance": [
             EFinancialCareersSearcher,
             IndeedSearcher,
             LinkedInSearcher,
             AngelListSearcher,
+            GlassdoorSearcher,
+            ToptalSearcher,
         ],
         "investment_banking": [
             EFinancialCareersSearcher,
             IndeedSearcher,
             LinkedInSearcher,
+            GlassdoorSearcher,
         ],
         "quantitative_analyst": [
             EFinancialCareersSearcher,
             DiceSearcher,
             IndeedSearcher,
             LinkedInSearcher,
+            ToptalSearcher,
         ],
-        
+
         # Healthcare
         "healthcare": [
             HealthCareersSearcher,  # Healthcare-focused job board
             IndeedSearcher,
             LinkedInSearcher,
             FlexJobsSearcher,
+            GlassdoorSearcher,
+            ZipRecruiterSearcher,
+            MonsterSearcher,
         ],
         "nurse": [
             HealthCareersSearcher,
             IndeedSearcher,
             LinkedInSearcher,
             FlexJobsSearcher,
+            ZipRecruiterSearcher,
+            MonsterSearcher,
         ],
         "physician": [
             HealthCareersSearcher,
             IndeedSearcher,
             LinkedInSearcher,
+            GlassdoorSearcher,
         ],
         "medical_technician": [
             HealthCareersSearcher,
             IndeedSearcher,
             LinkedInSearcher,
+            ZipRecruiterSearcher,
         ],
-        
+
         # Education
         "teacher": [
+            HigherEdJobsSearcher,  # Higher education jobs
             IndeedSearcher,
             LinkedInSearcher,
             FlexJobsSearcher,
+            IdealistSearcher,  # Non-profit education
+            ZipRecruiterSearcher,
+        ],
+        "professor": [
+            HigherEdJobsSearcher,
+            IndeedSearcher,
+            LinkedInSearcher,
         ],
         "trainer": [
             FlexJobsSearcher,
             IndeedSearcher,
             LinkedInSearcher,
             UpworkSearcher,
+            RemoteCoSearcher,
         ],
-        
+
         # Customer Service
         "customer_service": [
             FlexJobsSearcher,
             RemoteOKSearcher,
             IndeedSearcher,
             LinkedInSearcher,
+            ZipRecruiterSearcher,
+            RemoteCoSearcher,
+            WeWorkRemotelySearcher,
         ],
         "support": [
             RemoteOKSearcher,
             FlexJobsSearcher,
             IndeedSearcher,
             LinkedInSearcher,
+            WeWorkRemotelySearcher,
+            WorkingNomadsSearcher,
         ],
-        
+
         # Legal
         "legal": [
             LawJobsSearcher,  # Legal-focused job board
@@ -213,44 +312,103 @@ class SearcherRegistry:
             LinkedInSearcher,
             FlexJobsSearcher,
             UpworkSearcher,
+            GlassdoorSearcher,
         ],
         "attorney": [
             LawJobsSearcher,
             IndeedSearcher,
             LinkedInSearcher,
+            GlassdoorSearcher,
         ],
         "paralegal": [
             LawJobsSearcher,
             IndeedSearcher,
             LinkedInSearcher,
             FlexJobsSearcher,
+            ZipRecruiterSearcher,
         ],
         "compliance": [
             LawJobsSearcher,
             EFinancialCareersSearcher,
             IndeedSearcher,
             LinkedInSearcher,
+            GlassdoorSearcher,
         ],
-        
+
+        # Government
+        "government": [
+            USAJobsSearcher,  # Federal government jobs
+            IndeedSearcher,
+            LinkedInSearcher,
+            GlassdoorSearcher,
+        ],
+        "public_service": [
+            USAJobsSearcher,
+            IdealistSearcher,
+            IndeedSearcher,
+            LinkedInSearcher,
+        ],
+
+        # Non-profit / Social Impact
+        "nonprofit": [
+            IdealistSearcher,  # Non-profit focused
+            IndeedSearcher,
+            LinkedInSearcher,
+            FlexJobsSearcher,
+        ],
+        "social_worker": [
+            IdealistSearcher,
+            HealthCareersSearcher,
+            IndeedSearcher,
+            LinkedInSearcher,
+        ],
+
+        # Media & Communications
+        "journalist": [
+            MediabistroSearcher,
+            IndeedSearcher,
+            LinkedInSearcher,
+            FlexJobsSearcher,
+        ],
+        "public_relations": [
+            MediabistroSearcher,
+            IndeedSearcher,
+            LinkedInSearcher,
+            GlassdoorSearcher,
+        ],
+
         # Freelance/Consultant (any field)
         "freelancer": [
             UpworkSearcher,
             FlexJobsSearcher,
             RemoteOKSearcher,
+            FiverrSearcher,
+            FreelancerSearcher,
+            ToptalSearcher,
+            WeWorkRemotelySearcher,
+            JobspressoSearcher,
         ],
         "consultant": [
             UpworkSearcher,
             IndeedSearcher,
             LinkedInSearcher,
             FlexJobsSearcher,
+            ToptalSearcher,
+            FreelancerSearcher,
         ],
-        
+
         # Default/General
         "general": [
             IndeedSearcher,
             LinkedInSearcher,
             FlexJobsSearcher,
             RemoteOKSearcher,
+            GlassdoorSearcher,
+            ZipRecruiterSearcher,
+            MonsterSearcher,
+            SimplyHiredSearcher,
+            WeWorkRemotelySearcher,
+            RemoteCoSearcher,
         ],
     }
     
@@ -291,6 +449,25 @@ class SearcherRegistry:
     def get_all_professions(cls) -> List[str]:
         """Get list of all supported professions."""
         return list(cls.PROFESSION_SEARCHERS.keys())
+
+    @classmethod
+    def get_all_searchers(cls) -> List[BaseJobSearcher]:
+        """Get one instance of each unique searcher type."""
+        # Collect all unique searcher classes
+        all_classes = set()
+        for searcher_list in cls.PROFESSION_SEARCHERS.values():
+            all_classes.update(searcher_list)
+
+        # Instantiate each searcher once
+        searchers = []
+        for searcher_class in all_classes:
+            try:
+                searchers.append(searcher_class())
+            except Exception as e:
+                logger.error(f"Error instantiating {searcher_class.__name__}: {e}")
+
+        logger.info(f"Loaded {len(searchers)} total unique searchers")
+        return searchers
     
     @classmethod
     def suggest_profession(cls, keywords: List[str]) -> str:

@@ -173,7 +173,7 @@ export default function ProfileScreen() {
   };
 
   const handleSubscription = () => {
-    router.push('/subscription');
+    router.push('/subscription' as any);
   };
 
   const handlePrivacyPolicy = () => {

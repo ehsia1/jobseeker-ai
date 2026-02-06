@@ -15,8 +15,7 @@ class AngelListSearcher(BaseJobSearcher):
     """Searcher for AngelList/Wellfound startup jobs."""
     
     def __init__(self):
-        super().__init__()
-        self.source_name = "AngelList"
+        super().__init__("AngelList")
         # Wellfound (formerly AngelList Talent) API
         self.base_url = "https://wellfound.com/api/v1"
         

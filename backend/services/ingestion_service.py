@@ -1,7 +1,8 @@
 """Job ingestion service for coordinating data collection."""
 
 import asyncio
-from typing import List, Dict, Any
+from decimal import Decimal
+from typing import List, Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import logging
@@ -12,6 +13,9 @@ from backend.parsers import (
     RemoteOKParser,
     EmailJobParser
 )
+from backend.parsers.base import ParsedJob
+from backend.searchers.base import SearchQuery, SearchResult, BaseJobSearcher
+from backend.searchers.searcher_registry import SearcherRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -292,9 +296,212 @@ class IngestionService:
                 
             except Exception as e:
                 results["rss_parsers"][parser.source_name] = {
-                    "status": "error", 
+                    "status": "error",
                     "error": str(e)
                 }
                 results["overall_status"] = "partial_failure"
-        
+
         return results
+
+    def _search_result_to_parsed_job(self, result: SearchResult) -> ParsedJob:
+        """Convert a SearchResult to ParsedJob for storage."""
+        return ParsedJob(
+            source=result.source,
+            source_id=result.source_id,
+            title=result.title,
+            company=result.company,
+            description=result.description or "",
+            url=result.url,
+            location=result.location,
+            remote=result.remote,
+            skills=result.skills or [],
+            requirements=[],  # SearchResult doesn't have separate requirements
+            rate_min=Decimal(str(result.salary_min)) if result.salary_min else None,
+            rate_max=Decimal(str(result.salary_max)) if result.salary_max else None,
+            rate_type=result.salary_type,
+            posted_at=result.posted_date,
+            raw_data=result.raw_data or {}
+        )
+
+    async def _ingest_from_searcher(
+        self,
+        searcher: BaseJobSearcher,
+        query: SearchQuery
+    ) -> Dict[str, Any]:
+        """Ingest jobs from a single searcher."""
+
+        source_name = searcher.__class__.__name__
+        logger.info(f"Searching jobs from {source_name}")
+
+        try:
+            # Run the search
+            results = await searcher.search(query)
+
+            if not results:
+                logger.info(f"No results from {source_name}")
+                return {
+                    "source": source_name,
+                    "jobs_found": 0,
+                    "jobs_stored": 0
+                }
+
+            # Convert SearchResults to ParsedJobs
+            parsed_jobs = [self._search_result_to_parsed_job(r) for r in results]
+
+            # Store jobs
+            jobs_stored = await self._store_jobs(parsed_jobs)
+
+            return {
+                "source": source_name,
+                "jobs_found": len(results),
+                "jobs_stored": jobs_stored
+            }
+
+        except Exception as e:
+            logger.error(f"Error searching {source_name}: {e}")
+            return {
+                "source": source_name,
+                "jobs_found": 0,
+                "jobs_stored": 0,
+                "error": str(e)
+            }
+
+    async def ingest_from_searchers(
+        self,
+        keywords: List[str] = None,
+        profession: str = None,
+        location: str = None,
+        remote_only: bool = True,
+        limit_per_source: int = 50
+    ) -> Dict[str, Any]:
+        """
+        Run ingestion using job searchers.
+
+        Args:
+            keywords: Search keywords (e.g., ["python", "backend"])
+            profession: Profession type to get appropriate searchers
+            location: Location filter
+            remote_only: Only search for remote jobs
+            limit_per_source: Max jobs per searcher
+
+        Returns:
+            Summary of ingestion results
+        """
+        logger.info(f"Starting searcher ingestion for profession={profession}, keywords={keywords}")
+
+        # Build search query
+        query = SearchQuery(
+            keywords=keywords or [],
+            location=location,
+            remote_only=remote_only,
+            limit=limit_per_source
+        )
+
+        # Get searchers - either by profession or all available
+        if profession:
+            searchers = SearcherRegistry.get_searchers_for_profession(profession)
+        else:
+            # Use a default set of general-purpose searchers
+            searchers = SearcherRegistry.get_all_searchers()
+
+        if not searchers:
+            logger.warning(f"No searchers found for profession={profession}")
+            return {
+                "searcher_results": {},
+                "total_jobs_found": 0,
+                "total_jobs_stored": 0,
+                "errors": ["No searchers available for this profession"]
+            }
+
+        results = {
+            "searcher_results": {},
+            "total_jobs_found": 0,
+            "total_jobs_stored": 0,
+            "errors": []
+        }
+
+        # Run all searchers concurrently
+        tasks = []
+        for searcher in searchers:
+            tasks.append(self._ingest_from_searcher(searcher, query))
+
+        searcher_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Process results
+        for i, result in enumerate(searcher_results):
+            searcher_name = searchers[i].__class__.__name__
+
+            if isinstance(result, Exception):
+                error_msg = f"Error with {searcher_name}: {result}"
+                logger.error(error_msg)
+                results["errors"].append(error_msg)
+                results["searcher_results"][searcher_name] = {
+                    "jobs_found": 0,
+                    "jobs_stored": 0,
+                    "error": str(result)
+                }
+            else:
+                results["searcher_results"][searcher_name] = result
+                results["total_jobs_found"] += result.get("jobs_found", 0)
+                results["total_jobs_stored"] += result.get("jobs_stored", 0)
+                if result.get("error"):
+                    results["errors"].append(result["error"])
+
+        logger.info(
+            f"Searcher ingestion complete. "
+            f"Found {results['total_jobs_found']}, stored {results['total_jobs_stored']}"
+        )
+
+        return results
+
+    async def ingest_for_user_profile(
+        self,
+        user_id: str,
+        skills: List[str] = None,
+        profession: str = None,
+        location: str = None,
+        remote_only: bool = True,
+        limit_per_source: int = 30
+    ) -> Dict[str, Any]:
+        """
+        Run targeted ingestion based on user profile.
+
+        This is used to find jobs that match a specific user's skills and preferences.
+        """
+        logger.info(f"Running targeted ingestion for user {user_id}")
+
+        # Use skills as keywords if provided
+        keywords = skills[:10] if skills else None  # Limit to top 10 skills
+
+        return await self.ingest_from_searchers(
+            keywords=keywords,
+            profession=profession,
+            location=location,
+            remote_only=remote_only,
+            limit_per_source=limit_per_source
+        )
+
+    async def ingest_all_with_searchers(self, limit_per_source: int = 50) -> Dict[str, Any]:
+        """
+        Run full ingestion including both parsers and searchers.
+        """
+        logger.info("Starting full ingestion with parsers and searchers")
+
+        # Run parser-based ingestion
+        parser_results = await self.ingest_all_sources(limit_per_source=limit_per_source)
+
+        # Run searcher-based ingestion for general tech jobs
+        searcher_results = await self.ingest_from_searchers(
+            keywords=["software", "developer", "engineer"],
+            remote_only=True,
+            limit_per_source=limit_per_source
+        )
+
+        return {
+            "parser_results": parser_results,
+            "searcher_results": searcher_results,
+            "total_jobs": (
+                parser_results.get("total_jobs", 0) +
+                searcher_results.get("total_jobs_stored", 0)
+            )
+        }

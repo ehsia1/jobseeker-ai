@@ -26,21 +26,22 @@ class HackerNewsSearcher(BaseJobSearcher):
     async def search(self, query: SearchQuery) -> List[SearchResult]:
         """
         Search HackerNews Who's Hiring threads.
-        
+
         Strategy:
         1. Find the latest "Who is hiring?" thread
         2. Get all comments (job postings)
         3. Parse and filter based on query
         """
         try:
-            # Find the latest Who's Hiring thread
-            thread_id = await self._find_latest_hiring_thread()
-            if not thread_id:
-                logger.warning("Could not find HackerNews hiring thread")
-                return []
-            
-            # Get all job postings from the thread
-            jobs = await self._get_thread_jobs(thread_id)
+            async with aiohttp.ClientSession() as session:
+                # Find the latest Who's Hiring thread
+                thread_id = await self._find_latest_hiring_thread(session)
+                if not thread_id:
+                    logger.warning("Could not find HackerNews hiring thread")
+                    return []
+
+                # Get all job postings from the thread
+                jobs = await self._get_thread_jobs(thread_id, session)
             
             # Filter and parse jobs
             results = []
@@ -62,7 +63,7 @@ class HackerNewsSearcher(BaseJobSearcher):
             logger.error(f"Error searching HackerNews: {e}")
             return []
     
-    async def _find_latest_hiring_thread(self) -> Optional[int]:
+    async def _find_latest_hiring_thread(self, session: aiohttp.ClientSession) -> Optional[int]:
         """Find the most recent 'Who is hiring?' thread."""
         try:
             # Search for recent "Who is hiring?" posts by whoishiring user
@@ -71,8 +72,8 @@ class HackerNewsSearcher(BaseJobSearcher):
                 "tags": "story,author_whoishiring",
                 "hitsPerPage": 5
             }
-            
-            async with self.session.get(self.algolia_url, params=params) as response:
+
+            async with session.get(self.algolia_url, params=params) as response:
                 if response.status != 200:
                     return None
                 
@@ -90,22 +91,22 @@ class HackerNewsSearcher(BaseJobSearcher):
             logger.error(f"Error finding hiring thread: {e}")
             return None
     
-    async def _get_thread_jobs(self, thread_id: int) -> List[str]:
+    async def _get_thread_jobs(self, thread_id: int, session: aiohttp.ClientSession) -> List[str]:
         """Get all job postings from a thread."""
         jobs = []
-        
+
         try:
             # Get the thread item
-            async with self.session.get(f"{self.base_url}/item/{thread_id}.json") as response:
+            async with session.get(f"{self.base_url}/item/{thread_id}.json") as response:
                 if response.status != 200:
                     return jobs
                 
                 thread_data = await response.json()
                 kid_ids = thread_data.get('kids', [])
-                
+
                 # Fetch each comment (job posting)
                 for kid_id in kid_ids[:100]:  # Limit to first 100 to avoid too many requests
-                    async with self.session.get(f"{self.base_url}/item/{kid_id}.json") as resp:
+                    async with session.get(f"{self.base_url}/item/{kid_id}.json") as resp:
                         if resp.status == 200:
                             comment = await resp.json()
                             if comment and not comment.get('deleted') and not comment.get('dead'):
@@ -194,11 +195,17 @@ class HackerNewsSearcher(BaseJobSearcher):
                         break
             
             title = title_parts[0] if title_parts else f"Position at {company}" if company else "Software Engineer"
-            
+
+            # Truncate fields to fit database VARCHAR(255) limits
+            title = title[:200] if title else "Software Engineer"
+            company = company[:200] if company else None
+            url = url[:250] if url else None
+            location = location[:200] if location else None
+
             return SearchResult(
                 source=self.source_name,
                 source_id=None,
-                title=title[:100],  # Limit title length
+                title=title,
                 company=company,
                 description=text[:2000],  # Limit description
                 url=url,

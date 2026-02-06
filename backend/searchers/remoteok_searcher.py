@@ -28,14 +28,15 @@ class RemoteOKSearcher(BaseJobSearcher):
     async def search(self, query: SearchQuery) -> List[SearchResult]:
         """
         Search RemoteOK for jobs.
-        
+
         RemoteOK provides a JSON API with all their jobs.
         We'll filter based on the query parameters.
         """
         try:
             # RemoteOK doesn't have search params, returns all jobs
             # We'll filter client-side
-            async with self.session.get(self.base_url) as response:
+            async with aiohttp.ClientSession(headers=self.headers) as session:
+              async with session.get(self.base_url, timeout=aiohttp.ClientTimeout(total=15)) as response:
                 if response.status != 200:
                     logger.error(f"RemoteOK API returned status {response.status}")
                     return []

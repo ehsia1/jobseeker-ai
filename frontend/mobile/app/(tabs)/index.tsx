@@ -13,7 +13,7 @@ import { useRouter } from 'expo-router';
 import { useJobsInfinite, useMatchesInfinite, useSaveJob } from '../../src/hooks/useJobs';
 import { useJobRadar } from '../../src/hooks/useAgent';
 import JobCard from '../../src/components/JobCard';
-import type { ScoredJob, JobRadarMatch, JobFilters } from '@jobseeker/shared';
+import type { Job, ScoredJob, JobRadarMatch, JobFilters } from '@jobseeker/shared';
 
 export default function JobFeedScreen() {
   const router = useRouter();
@@ -80,13 +80,13 @@ export default function JobFeedScreen() {
   }, [matchesData]);
 
   const handleJobPress = useCallback(
-    (job: ScoredJob) => {
+    (job: Job | ScoredJob) => {
       router.push(`/job/${job.id}`);
     },
     [router]
   );
 
-  const handleSave = useCallback((job: ScoredJob) => {
+  const handleSave = useCallback((job: Job | ScoredJob) => {
     // Don't save if already saved
     if (savedJobIds.has(job.id)) {
       Alert.alert('Already Saved', 'This job is already in your saved matches.');
@@ -103,7 +103,7 @@ export default function JobFeedScreen() {
     });
   }, [savedJobIds, saveJobMutation]);
 
-  const handleApply = useCallback((job: ScoredJob) => {
+  const handleApply = useCallback((job: Job | ScoredJob) => {
     // Navigate to job details with apply intent
     router.push(`/job/${job.id}?action=apply`);
   }, [router]);
@@ -132,7 +132,7 @@ export default function JobFeedScreen() {
   }, [router]);
 
   const renderItem = useCallback(
-    ({ item }: { item: ScoredJob }) => (
+    ({ item }: { item: Job | ScoredJob }) => (
       <JobCard
         job={item}
         onPress={handleJobPress}

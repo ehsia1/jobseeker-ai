@@ -167,12 +167,86 @@ class ApplicationTrackingService:
             job_match.applied_at = datetime.utcnow()
 
         await self.db.flush()
+
+        # Auto-create follow-up reminder when marking as applied
+        if new_status == ApplicationStatus.APPLIED:
+            try:
+                await self._create_auto_follow_up(user_id, job_match_id, job_match)
+            except Exception as e:
+                # Don't fail the status update if reminder creation fails
+                logger.warning(f"Failed to create auto follow-up reminder: {e}")
+
         logger.info(
             f"Updated application status for match {job_match_id}: "
             f"{current_status.value} -> {new_status.value}"
         )
 
         return timeline_entry
+
+    async def _create_auto_follow_up(
+        self,
+        user_id: UUID,
+        job_match_id: UUID,
+        job_match: JobMatch,
+    ) -> Optional[ApplicationReminder]:
+        """Create automatic follow-up reminder when job is marked as applied.
+
+        Args:
+            user_id: User ID.
+            job_match_id: Job match ID.
+            job_match: The job match object (for job title).
+
+        Returns:
+            Created reminder or None if skipped.
+        """
+        # Check if a follow-up reminder already exists for this match
+        result = await self.db.execute(
+            select(ApplicationReminder)
+            .where(
+                and_(
+                    ApplicationReminder.job_match_id == job_match_id,
+                    ApplicationReminder.user_id == user_id,
+                    ApplicationReminder.reminder_type == ReminderType.FOLLOW_UP.value,
+                    ApplicationReminder.is_completed == False,
+                    ApplicationReminder.is_dismissed == False,
+                )
+            )
+        )
+        existing = result.scalar_one_or_none()
+
+        if existing:
+            logger.info(f"Follow-up reminder already exists for match {job_match_id}")
+            return None
+
+        # Get job title for the reminder
+        job_title = "this position"
+        if job_match.job:
+            job_title = job_match.job.title
+        elif hasattr(job_match, 'job_id'):
+            # Try to load job
+            job_result = await self.db.execute(
+                select(Job).where(Job.id == job_match.job_id)
+            )
+            job = job_result.scalar_one_or_none()
+            if job:
+                job_title = job.title
+
+        # Create follow-up reminder for 7 days from now
+        scheduled_for = datetime.utcnow() + timedelta(days=7)
+
+        reminder = ApplicationReminder(
+            job_match_id=job_match_id,
+            user_id=user_id,
+            reminder_type=ReminderType.FOLLOW_UP.value,
+            title=f"Follow up: {job_title[:50]}",
+            description="No response yet? Consider sending a polite follow-up email to check on your application status.",
+            scheduled_for=scheduled_for,
+        )
+        self.db.add(reminder)
+        await self.db.flush()
+
+        logger.info(f"Created auto follow-up reminder for match {job_match_id}, due {scheduled_for}")
+        return reminder
 
     async def get_application_timeline(
         self,

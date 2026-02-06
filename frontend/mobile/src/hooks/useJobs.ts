@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { jobsApi, matchesApi, profileApi, usersApi } from '../api/client';
+import { jobsApi, matchesApi, profileApi, usersApi, subscriptionApi } from '../api/client';
 import type { SearchQuery, JobMatchStatus, UserProfile, Resume, User, JobFilters } from '@jobseeker/shared';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -300,5 +300,18 @@ export function useDeleteAvatar() {
       await queryClient.invalidateQueries({ queryKey: ['auth'] });
       await refreshUser();
     },
+  });
+}
+
+// ============= Subscription Hooks =============
+
+// Fetch user subscription
+export function useSubscription() {
+  const { isAuthenticated } = useAuth();
+
+  return useQuery({
+    queryKey: ['subscription'],
+    queryFn: () => subscriptionApi.getSubscription(),
+    enabled: isAuthenticated,
   });
 }

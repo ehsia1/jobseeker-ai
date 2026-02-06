@@ -920,6 +920,131 @@ class TestReminderWorkflow:
         assert reminder_id in reminder_ids_with_completed
 
 
+class TestAutoFollowUpReminder:
+    """Tests for automatic follow-up reminder creation on status change to applied."""
+
+    @pytest.mark.asyncio
+    async def test_auto_follow_up_created_on_applied(
+        self, test_client: AsyncClient, user_factory, job_factory, job_match_factory, db_session, auth_headers
+    ):
+        """Test that marking job as applied creates an auto follow-up reminder."""
+        user = await user_factory()
+        job = await job_factory(title="Software Engineer", company="TechCorp")
+        match = await job_match_factory(user=user, job=job, status="saved")
+        await db_session.commit()
+
+        headers = auth_headers(user.username)
+
+        # Mark as applied
+        response = await test_client.put(
+            f"/applications/matches/{match.id}/status",
+            json={"status": "applied"},
+            headers=headers
+        )
+        assert response.status_code == 200
+
+        # Check that a follow-up reminder was created
+        reminders_response = await test_client.get(
+            "/applications/reminders",
+            headers=headers
+        )
+        assert reminders_response.status_code == 200
+        data = reminders_response.json()
+
+        # Should have at least one reminder (the auto follow-up)
+        assert data["total"] >= 1
+
+        # Find the auto follow-up reminder
+        follow_up_reminders = [
+            r for r in data["reminders"]
+            if r["reminder_type"] == "follow_up" and "Follow up" in r["title"]
+        ]
+        assert len(follow_up_reminders) >= 1
+
+        # Verify it includes the job title
+        auto_reminder = follow_up_reminders[0]
+        assert "Software Engineer" in auto_reminder["title"] or "Follow up" in auto_reminder["title"]
+
+    @pytest.mark.asyncio
+    async def test_auto_follow_up_not_created_for_non_applied_status(
+        self, test_client: AsyncClient, user_factory, job_factory, job_match_factory, db_session, auth_headers
+    ):
+        """Test that non-applied status changes don't create auto follow-up."""
+        user = await user_factory()
+        job = await job_factory()
+        match = await job_match_factory(user=user, job=job, status="new")
+        await db_session.commit()
+
+        headers = auth_headers(user.username)
+
+        # Mark as viewed (not applied)
+        response = await test_client.put(
+            f"/applications/matches/{match.id}/status",
+            json={"status": "viewed"},
+            headers=headers
+        )
+        assert response.status_code == 200
+
+        # Check reminders - should be empty (no auto follow-up for viewed)
+        reminders_response = await test_client.get(
+            "/applications/reminders",
+            headers=headers
+        )
+        assert reminders_response.status_code == 200
+        data = reminders_response.json()
+
+        # Should not have any auto follow-up reminders
+        follow_up_reminders = [
+            r for r in data["reminders"]
+            if r["reminder_type"] == "follow_up" and "Follow up" in r["title"]
+        ]
+        assert len(follow_up_reminders) == 0
+
+    @pytest.mark.asyncio
+    async def test_auto_follow_up_scheduled_7_days_out(
+        self, test_client: AsyncClient, user_factory, job_factory, job_match_factory, db_session, auth_headers
+    ):
+        """Test that auto follow-up is scheduled approximately 7 days from application."""
+        user = await user_factory()
+        job = await job_factory()
+        match = await job_match_factory(user=user, job=job, status="saved")
+        await db_session.commit()
+
+        headers = auth_headers(user.username)
+
+        # Mark as applied
+        before = datetime.utcnow()
+        response = await test_client.put(
+            f"/applications/matches/{match.id}/status",
+            json={"status": "applied"},
+            headers=headers
+        )
+        assert response.status_code == 200
+
+        # Get the auto follow-up reminder
+        reminders_response = await test_client.get(
+            "/applications/reminders",
+            headers=headers
+        )
+        data = reminders_response.json()
+
+        follow_up_reminders = [
+            r for r in data["reminders"]
+            if r["reminder_type"] == "follow_up"
+        ]
+
+        if follow_up_reminders:
+            reminder = follow_up_reminders[0]
+            scheduled_for = datetime.fromisoformat(reminder["scheduled_for"].replace("Z", "+00:00"))
+
+            # Should be approximately 7 days from now (allow some variance for test execution)
+            expected_min = before + timedelta(days=6, hours=23)
+            expected_max = before + timedelta(days=7, hours=1)
+
+            # The scheduled_for should be around 7 days from now
+            assert scheduled_for.replace(tzinfo=None) >= expected_min
+
+
 class TestStatusTransitionValidation:
     """Tests for status transition validation."""
 

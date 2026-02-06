@@ -10,7 +10,7 @@ import type {
   AuthResponse,
   Subscription,
   SubscriptionWithUsage,
-} from '../../shared/src/types';
+} from '@jobseeker/shared';
 
 // ============= Mock Data Factories =============
 

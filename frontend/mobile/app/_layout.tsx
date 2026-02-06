@@ -109,6 +109,13 @@ function RootLayoutNav() {
                 headerTitle: 'Job Details',
               }}
             />
+            <Stack.Screen
+              name="subscription"
+              options={{
+                presentation: 'modal',
+                headerShown: false,
+              }}
+            />
           </Stack>
         </AuthGate>
       </ThemeProvider>

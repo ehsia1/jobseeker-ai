@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { authApi, getToken, removeToken } from '../api/client';
-import type { User, UserProfile } from '../../shared/src/types';
+import type { User, UserProfile } from '@jobseeker/shared';
 
 interface AuthState {
   user: (User & { profile?: UserProfile }) | null;

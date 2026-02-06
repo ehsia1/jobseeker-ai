@@ -37,7 +37,7 @@ import type {
   AutoApplyRequest,
   AutoApplyResult,
   JobFilters,
-} from '../../shared/src/types';
+} from '@jobseeker/shared';
 
 // For simulators/emulators:
 // - iOS Simulator: Use machine's IP address
@@ -605,5 +605,89 @@ export const agentApi = {
   },
   async getAutoApplyResult(runId: string): Promise<AutoApplyResult> {
     return apiFetch(`/agent/apply/result/${runId}`);
+  },
+};
+
+// Reminder types
+export interface Reminder {
+  id: string;
+  job_match_id: string;
+  reminder_type: 'follow_up' | 'interview_prep' | 'interview' | 'deadline' | 'custom';
+  title: string;
+  description?: string;
+  scheduled_for: string;
+  is_completed: boolean;
+  completed_at?: string;
+  is_dismissed: boolean;
+  notification_sent: boolean;
+  created_at: string;
+  updated_at: string;
+  job_title?: string;
+  company?: string;
+}
+
+export interface ReminderListResponse {
+  reminders: Reminder[];
+  total: number;
+  overdue_count: number;
+  upcoming_count: number;
+}
+
+// Reminders API
+export const remindersApi = {
+  async getReminders(
+    includeCompleted = false,
+    includeDismissed = false,
+    limit = 50
+  ): Promise<ReminderListResponse> {
+    const params = new URLSearchParams();
+    params.set('include_completed', includeCompleted.toString());
+    params.set('include_dismissed', includeDismissed.toString());
+    params.set('limit', limit.toString());
+    return apiFetch(`/applications/reminders?${params.toString()}`);
+  },
+
+  async getUpcomingReminders(hoursAhead = 24): Promise<{ reminders: Reminder[]; hours_window: number }> {
+    return apiFetch(`/applications/reminders/upcoming?hours_ahead=${hoursAhead}`);
+  },
+
+  async getOverdueReminders(): Promise<Reminder[]> {
+    return apiFetch('/applications/reminders/overdue');
+  },
+
+  async createReminder(
+    matchId: string,
+    data: {
+      title: string;
+      scheduled_for: string;
+      reminder_type?: 'follow_up' | 'interview_prep' | 'interview' | 'deadline' | 'custom';
+      description?: string;
+    }
+  ): Promise<Reminder> {
+    return apiFetch(`/applications/matches/${matchId}/reminders`, {
+      method: 'POST',
+      body: JSON.stringify({
+        ...data,
+        reminder_type: data.reminder_type || 'custom',
+      }),
+    });
+  },
+
+  async completeReminder(reminderId: string): Promise<Reminder> {
+    return apiFetch(`/applications/reminders/${reminderId}/complete`, {
+      method: 'POST',
+    });
+  },
+
+  async dismissReminder(reminderId: string): Promise<Reminder> {
+    return apiFetch(`/applications/reminders/${reminderId}/dismiss`, {
+      method: 'POST',
+    });
+  },
+
+  async deleteReminder(reminderId: string): Promise<void> {
+    return apiFetch(`/applications/reminders/${reminderId}`, {
+      method: 'DELETE',
+    });
   },
 };

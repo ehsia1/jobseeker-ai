@@ -15,8 +15,7 @@ class FlexJobsSearcher(BaseJobSearcher):
     """Searcher for FlexJobs - remote, part-time, and flexible positions."""
     
     def __init__(self):
-        super().__init__()
-        self.source_name = "FlexJobs"
+        super().__init__("FlexJobs")
         # FlexJobs requires subscription for full access
         # This uses their public search interface
         self.base_url = "https://www.flexjobs.com/search"

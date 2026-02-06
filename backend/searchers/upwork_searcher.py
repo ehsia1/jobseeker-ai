@@ -15,8 +15,7 @@ class UpworkSearcher(BaseJobSearcher):
     """Searcher for Upwork freelance jobs."""
     
     def __init__(self):
-        super().__init__()
-        self.source_name = "Upwork"
+        super().__init__("Upwork")
         # Upwork API requires OAuth
         self.base_url = "https://www.upwork.com/api/profiles/v2/search/jobs.json"
         

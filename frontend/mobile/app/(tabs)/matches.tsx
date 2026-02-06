@@ -7,13 +7,14 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { Text, Chip, SegmentedButtons, Button, Portal, Modal, ProgressBar } from 'react-native-paper';
 import { useRouter } from 'expo-router';
-import { useMatchesInfinite } from '../../src/hooks/useJobs';
+import { useMatchesInfinite, useUpdateMatchStatus } from '../../src/hooks/useJobs';
 import { useApplicationTracker } from '../../src/hooks/useAgent';
 import JobCard from '../../src/components/JobCard';
-import type { JobMatch, TrackerActionItem } from '@jobseeker/shared';
+import type { JobMatch, TrackerActionItem, TrackerRecommendation, JobMatchStatus } from '@jobseeker/shared';
 
 type StatusFilter = 'all' | 'saved' | 'applied' | 'interviewing';
 
@@ -58,6 +59,60 @@ export default function MatchesScreen() {
     [router]
   );
 
+  // Status update mutation
+  const updateStatusMutation = useUpdateMatchStatus();
+
+  const handleStatusUpdate = useCallback(
+    (match: JobMatch, newStatus: JobMatchStatus, confirmMessage?: string) => {
+      const doUpdate = () => {
+        updateStatusMutation.mutate(
+          { matchId: match.id, status: newStatus },
+          {
+            onSuccess: () => {
+              refetch();
+            },
+            onError: (err) => {
+              Alert.alert('Error', err.message || 'Failed to update status');
+            },
+          }
+        );
+      };
+
+      if (confirmMessage) {
+        Alert.alert('Update Status', confirmMessage, [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Confirm', onPress: doUpdate },
+        ]);
+      } else {
+        doUpdate();
+      }
+    },
+    [updateStatusMutation, refetch]
+  );
+
+  // Get next status options based on current status
+  const getStatusActions = (status: string): { label: string; status: JobMatchStatus; style: 'success' | 'danger' | 'neutral' }[] => {
+    switch (status) {
+      case 'saved':
+        return [
+          { label: 'Mark Applied', status: 'applied', style: 'success' },
+          { label: 'Not Interested', status: 'rejected', style: 'danger' },
+        ];
+      case 'applied':
+        return [
+          { label: 'Got Interview!', status: 'interviewing', style: 'success' },
+          { label: 'Rejected', status: 'rejected', style: 'danger' },
+        ];
+      case 'interviewing':
+        return [
+          { label: 'Got Offer!', status: 'offer_received' as JobMatchStatus, style: 'success' },
+          { label: 'Rejected', status: 'rejected', style: 'danger' },
+        ];
+      default:
+        return [];
+    }
+  };
+
   // Run Application Tracker briefing
   const handleGetBriefing = useCallback(() => {
     setBriefingModalVisible(true);
@@ -97,38 +152,71 @@ export default function MatchesScreen() {
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const renderItem = useCallback(
-    ({ item }: { item: JobMatch }) => (
-      <View style={styles.matchCard}>
-        <View style={styles.matchHeader}>
-          <Chip
-            style={[styles.statusChip, getStatusStyle(item.status)]}
-            textStyle={styles.statusChipText}
-          >
-            {formatStatus(item.status)}
-          </Chip>
-          <Text variant="bodySmall" style={styles.matchDate}>
-            Matched {formatDate(item.created_at)}
-          </Text>
-        </View>
-        <JobCard
-          job={item.job as any}
-          onPress={() => handleMatchPress(item)}
-          onApply={() => handleApply(item)}
-          isSaved={true}
-        />
-        {item.notes && (
-          <View style={styles.notesContainer}>
-            <Text variant="bodySmall" style={styles.notesLabel}>
-              Notes:
-            </Text>
-            <Text variant="bodySmall" style={styles.notesText}>
-              {item.notes}
+    ({ item }: { item: JobMatch }) => {
+      const statusActions = getStatusActions(item.status);
+
+      return (
+        <View style={styles.matchCard}>
+          <View style={styles.matchHeader}>
+            <Chip
+              style={[styles.statusChip, getStatusStyle(item.status)]}
+              textStyle={styles.statusChipText}
+            >
+              {formatStatus(item.status)}
+            </Chip>
+            <Text variant="bodySmall" style={styles.matchDate}>
+              Matched {formatDate(item.created_at)}
             </Text>
           </View>
-        )}
-      </View>
-    ),
-    [handleMatchPress, handleApply]
+          <JobCard
+            job={item.job as any}
+            onPress={() => handleMatchPress(item)}
+            onApply={() => handleApply(item)}
+            isSaved={true}
+          />
+          {item.client_notes && (
+            <View style={styles.notesContainer}>
+              <Text variant="bodySmall" style={styles.notesLabel}>
+                Notes:
+              </Text>
+              <Text variant="bodySmall" style={styles.notesText}>
+                {item.client_notes}
+              </Text>
+            </View>
+          )}
+          {/* Status Progression Buttons */}
+          {statusActions.length > 0 && (
+            <View style={styles.statusActionsContainer}>
+              {statusActions.map((action) => (
+                <Button
+                  key={action.status}
+                  mode={action.style === 'success' ? 'contained' : 'outlined'}
+                  onPress={() => handleStatusUpdate(
+                    item,
+                    action.status,
+                    action.style === 'danger' ? `Mark this job as ${action.label.toLowerCase()}?` : undefined
+                  )}
+                  style={[
+                    styles.statusActionButton,
+                    action.style === 'success' && styles.successButton,
+                    action.style === 'danger' && styles.dangerButton,
+                  ]}
+                  labelStyle={[
+                    styles.statusActionLabel,
+                    action.style === 'danger' && styles.dangerLabel,
+                  ]}
+                  compact
+                  disabled={updateStatusMutation.isPending}
+                >
+                  {action.label}
+                </Button>
+              ))}
+            </View>
+          )}
+        </View>
+      );
+    },
+    [handleMatchPress, handleApply, handleStatusUpdate, updateStatusMutation.isPending]
   );
 
   const renderFooter = useCallback(() => {
@@ -364,7 +452,7 @@ export default function MatchesScreen() {
                     <Text variant="titleMedium" style={styles.sectionTitle}>
                       Action Items
                     </Text>
-                    {applicationTracker.result.action_items.map((item, index) => (
+                    {applicationTracker.result.action_items.map((item: TrackerActionItem, index: number) => (
                       <TouchableOpacity
                         key={`${item.application_id || index}-${index}`}
                         style={styles.actionItem}
@@ -409,7 +497,7 @@ export default function MatchesScreen() {
                     <Text variant="titleMedium" style={styles.sectionTitle}>
                       Insights
                     </Text>
-                    {applicationTracker.result.portfolio_analysis?.insights.map((insight, index) => (
+                    {applicationTracker.result.portfolio_analysis?.insights.map((insight: string, index: number) => (
                       <View key={index} style={styles.insightItem}>
                         <Text style={styles.insightBullet}>•</Text>
                         <Text variant="bodySmall" style={styles.insightText}>
@@ -426,7 +514,7 @@ export default function MatchesScreen() {
                     <Text variant="titleMedium" style={styles.sectionTitle}>
                       Recommendations
                     </Text>
-                    {applicationTracker.result.recommendations.map((rec, index) => (
+                    {applicationTracker.result.recommendations.map((rec: TrackerRecommendation, index: number) => (
                       <View key={index} style={styles.recommendationItem}>
                         <Chip
                           style={[
@@ -833,5 +921,28 @@ const styles = StyleSheet.create({
   recommendationDescription: {
     color: '#6b7280',
     lineHeight: 20,
+  },
+  // Status action buttons
+  statusActionsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+    gap: 8,
+  },
+  statusActionButton: {
+    minWidth: 100,
+  },
+  statusActionLabel: {
+    fontSize: 12,
+  },
+  successButton: {
+    backgroundColor: '#10b981',
+  },
+  dangerButton: {
+    borderColor: '#dc2626',
+  },
+  dangerLabel: {
+    color: '#dc2626',
   },
 });

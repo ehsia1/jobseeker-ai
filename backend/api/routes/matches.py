@@ -249,6 +249,18 @@ async def update_match_status(
     await db.commit()
     await db.refresh(match)
 
+    # Auto-create follow-up reminder when marking as applied
+    if new_status == "applied":
+        try:
+            from backend.services.application_service import ApplicationTrackingService
+            service = ApplicationTrackingService(db)
+            await service._create_auto_follow_up(current_user.id, match.id, match)
+            await db.commit()
+            logger.info(f"Auto-created follow-up reminder for match {match.id}")
+        except Exception as e:
+            # Don't fail the status update if reminder creation fails
+            logger.warning(f"Failed to create auto follow-up reminder: {e}")
+
     # Trigger cover letter pre-generation when job is saved
     if new_status == "saved":
         try:

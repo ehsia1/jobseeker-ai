@@ -1,2 +1,2 @@
-export { JobCard } from './JobCard';
+export { default as JobCard } from './JobCard';
 export { ScoreBadge, ScoreBreakdownBar } from './ScoreBadge';

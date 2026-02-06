@@ -585,3 +585,199 @@ class TestReminderQueries:
 
         assert result is None
         mock_db.execute.assert_called_once()
+
+
+class TestAutoFollowUpReminder:
+    """Tests for automatic follow-up reminder creation."""
+
+    @pytest.fixture
+    def mock_db(self):
+        """Create mock database session."""
+        mock = MagicMock()
+        mock.add = MagicMock()
+        mock.delete = AsyncMock()
+        mock.flush = AsyncMock()
+        mock.execute = AsyncMock()
+        return mock
+
+    @pytest.fixture
+    def service(self, mock_db):
+        """Create service with mock db."""
+        return ApplicationTrackingService(mock_db)
+
+    @pytest.fixture
+    def mock_job_match_with_job(self):
+        """Create mock job match with job relationship."""
+        job = MagicMock()
+        job.id = uuid4()
+        job.title = "Software Engineer at TechCorp"
+
+        match = MagicMock(spec=JobMatch)
+        match.id = uuid4()
+        match.user_id = uuid4()
+        match.job_id = job.id
+        match.status = "saved"
+        match.applied_at = None
+        match.job = job
+        return match
+
+    @pytest.mark.asyncio
+    async def test_create_auto_follow_up_creates_reminder(
+        self, service, mock_db, mock_job_match_with_job
+    ):
+        """Test that auto follow-up creates a reminder when transitioning to APPLIED."""
+        user_id = mock_job_match_with_job.user_id
+        job_match_id = mock_job_match_with_job.id
+
+        # First execute returns the job match, second returns no existing reminder
+        mock_result1 = MagicMock()
+        mock_result1.scalar_one_or_none.return_value = mock_job_match_with_job
+
+        mock_result2 = MagicMock()
+        mock_result2.scalar_one_or_none.return_value = None  # No existing follow-up
+
+        mock_db.execute.side_effect = [mock_result1, mock_result2]
+
+        result = await service._create_auto_follow_up(
+            user_id=user_id,
+            job_match_id=job_match_id,
+            job_match=mock_job_match_with_job,
+        )
+
+        # Verify reminder was added
+        mock_db.add.assert_called_once()
+        mock_db.flush.assert_called_once()
+
+        # Verify it's a follow-up type reminder
+        added_reminder = mock_db.add.call_args[0][0]
+        assert added_reminder.reminder_type == ReminderType.FOLLOW_UP.value
+        assert added_reminder.user_id == user_id
+        assert added_reminder.job_match_id == job_match_id
+        assert "Follow up" in added_reminder.title
+
+    @pytest.mark.asyncio
+    async def test_create_auto_follow_up_skips_if_exists(
+        self, service, mock_db, mock_job_match_with_job
+    ):
+        """Test that auto follow-up is not created if one already exists."""
+        user_id = mock_job_match_with_job.user_id
+        job_match_id = mock_job_match_with_job.id
+
+        # Return an existing reminder
+        existing_reminder = MagicMock(spec=ApplicationReminder)
+        existing_reminder.id = uuid4()
+        existing_reminder.reminder_type = ReminderType.FOLLOW_UP.value
+
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = existing_reminder
+        mock_db.execute.return_value = mock_result
+
+        result = await service._create_auto_follow_up(
+            user_id=user_id,
+            job_match_id=job_match_id,
+            job_match=mock_job_match_with_job,
+        )
+
+        # Should return None and not add anything
+        assert result is None
+        mock_db.add.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_create_auto_follow_up_uses_job_title(
+        self, service, mock_db, mock_job_match_with_job
+    ):
+        """Test that auto follow-up uses the job title in the reminder."""
+        user_id = mock_job_match_with_job.user_id
+        job_match_id = mock_job_match_with_job.id
+
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_result
+
+        result = await service._create_auto_follow_up(
+            user_id=user_id,
+            job_match_id=job_match_id,
+            job_match=mock_job_match_with_job,
+        )
+
+        # Verify the title includes the job title
+        added_reminder = mock_db.add.call_args[0][0]
+        assert "Software Engineer" in added_reminder.title
+
+    @pytest.mark.asyncio
+    async def test_create_auto_follow_up_scheduled_7_days_ahead(
+        self, service, mock_db, mock_job_match_with_job
+    ):
+        """Test that auto follow-up is scheduled 7 days in the future."""
+        user_id = mock_job_match_with_job.user_id
+        job_match_id = mock_job_match_with_job.id
+
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_result
+
+        before = datetime.utcnow()
+        result = await service._create_auto_follow_up(
+            user_id=user_id,
+            job_match_id=job_match_id,
+            job_match=mock_job_match_with_job,
+        )
+        after = datetime.utcnow()
+
+        # Verify scheduled_for is approximately 7 days from now
+        added_reminder = mock_db.add.call_args[0][0]
+        expected_min = before + timedelta(days=7)
+        expected_max = after + timedelta(days=7)
+        assert expected_min <= added_reminder.scheduled_for <= expected_max
+
+    @pytest.mark.asyncio
+    async def test_update_status_to_applied_creates_auto_follow_up(
+        self, service, mock_db, mock_job_match_with_job
+    ):
+        """Test that transitioning to APPLIED status triggers auto follow-up creation."""
+        mock_job_match_with_job.status = "saved"
+        user_id = mock_job_match_with_job.user_id
+        job_match_id = mock_job_match_with_job.id
+
+        # First call returns job match, second call checks for existing reminder
+        mock_result1 = MagicMock()
+        mock_result1.scalar_one_or_none.return_value = mock_job_match_with_job
+
+        mock_result2 = MagicMock()
+        mock_result2.scalar_one_or_none.return_value = None  # No existing reminder
+
+        mock_db.execute.side_effect = [mock_result1, mock_result2]
+
+        result = await service.update_application_status(
+            user_id=user_id,
+            job_match_id=job_match_id,
+            new_status=ApplicationStatus.APPLIED,
+        )
+
+        # Verify status was updated
+        assert mock_job_match_with_job.status == ApplicationStatus.APPLIED.value
+
+        # Verify add was called twice (timeline entry + auto follow-up)
+        assert mock_db.add.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_update_status_to_non_applied_no_auto_follow_up(
+        self, service, mock_db, mock_job_match_with_job
+    ):
+        """Test that non-APPLIED status transitions don't create auto follow-up."""
+        mock_job_match_with_job.status = "new"
+        user_id = mock_job_match_with_job.user_id
+        job_match_id = mock_job_match_with_job.id
+
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = mock_job_match_with_job
+        mock_db.execute.return_value = mock_result
+
+        result = await service.update_application_status(
+            user_id=user_id,
+            job_match_id=job_match_id,
+            new_status=ApplicationStatus.VIEWED,
+        )
+
+        # Only timeline entry should be added, no auto follow-up
+        assert mock_db.add.call_count == 1

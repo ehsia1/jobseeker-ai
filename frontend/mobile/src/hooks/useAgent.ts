@@ -28,7 +28,7 @@ import type {
   NetworkIntelligenceResult,
   AutoApplyRequest,
   AutoApplyResult,
-} from '../../shared/src/types';
+} from '@jobseeker/shared';
 
 // Polling interval in ms
 const POLL_INTERVAL = 1000;

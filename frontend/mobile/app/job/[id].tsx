@@ -10,6 +10,7 @@ import {
   Platform,
   Alert,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import {
   Text,
   Button,
@@ -128,9 +129,17 @@ export default function JobDetailsScreen() {
   }, [coverLetter.isCompleted, coverLetter.result]);
 
   const handleCopyProposal = async () => {
-    // Using expo-clipboard would be better, but for now just alert
-    // In production: await Clipboard.setStringAsync(proposal);
-    console.log('Copy proposal:', proposal);
+    if (!proposal) {
+      Alert.alert('Nothing to copy', 'Generate a cover letter first.');
+      return;
+    }
+    try {
+      await Clipboard.setStringAsync(proposal);
+      Alert.alert('Copied!', 'Cover letter copied to clipboard. You can now paste it into your application.');
+    } catch (error) {
+      console.error('Failed to copy:', error);
+      Alert.alert('Error', 'Failed to copy to clipboard.');
+    }
   };
 
   const handleMarkApplied = async () => {
