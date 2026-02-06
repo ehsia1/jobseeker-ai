@@ -39,6 +39,12 @@ from backend.models.proposal import (
     ProposalStyle,
     ABTestStatus,
 )
+from backend.models.client_risk import (
+    ClientRiskAssessment,
+    CompanyRiskProfile,
+    RiskLevel,
+    RiskCategory,
+)
 
 __all__ = [
     "User",
@@ -73,4 +79,8 @@ __all__ = [
     "ProposalTone",
     "ProposalStyle",
     "ABTestStatus",
+    "ClientRiskAssessment",
+    "CompanyRiskProfile",
+    "RiskLevel",
+    "RiskCategory",
 ]

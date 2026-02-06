@@ -980,3 +980,52 @@ export const abTestApi = {
     });
   },
 };
+
+// ============= Client Risk API =============
+
+import type {
+  ClientRiskAssessment,
+  ClientRiskBrief,
+  CompanyRiskProfile,
+  RiskStats,
+} from '@jobseeker/shared';
+
+export const clientRiskApi = {
+  async getJobRisk(jobId: string, analyzeIfMissing: boolean = true): Promise<ClientRiskAssessment> {
+    return apiFetch(`/risk/job/${jobId}?analyze_if_missing=${analyzeIfMissing}`);
+  },
+
+  async analyzeJob(jobId: string, forceRefresh: boolean = false): Promise<ClientRiskAssessment> {
+    return apiFetch('/risk/analyze', {
+      method: 'POST',
+      body: JSON.stringify({ job_id: jobId, force_refresh: forceRefresh }),
+    });
+  },
+
+  async analyzeJobsBatch(jobIds: string[]): Promise<{ analyzed: number; failed: number; results: ClientRiskBrief[] }> {
+    return apiFetch('/risk/analyze/batch', {
+      method: 'POST',
+      body: JSON.stringify({ job_ids: jobIds }),
+    });
+  },
+
+  async getMatchesRisk(minScore: number = 0): Promise<ClientRiskBrief[]> {
+    return apiFetch(`/risk/matches?min_score=${minScore}`);
+  },
+
+  async getCompanyProfile(companyName: string): Promise<CompanyRiskProfile> {
+    return apiFetch(`/risk/company/${encodeURIComponent(companyName)}`);
+  },
+
+  async listCompanyProfiles(riskLevel?: string, limit: number = 20): Promise<CompanyRiskProfile[]> {
+    let url = `/risk/companies?limit=${limit}`;
+    if (riskLevel) {
+      url += `&risk_level=${riskLevel}`;
+    }
+    return apiFetch(url);
+  },
+
+  async getStats(): Promise<RiskStats> {
+    return apiFetch('/risk/stats');
+  },
+};

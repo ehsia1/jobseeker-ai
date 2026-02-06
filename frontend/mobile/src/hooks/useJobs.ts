@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { jobsApi, matchesApi, profileApi, usersApi, subscriptionApi, abTestApi } from '../api/client';
+import { jobsApi, matchesApi, profileApi, usersApi, subscriptionApi, abTestApi, clientRiskApi } from '../api/client';
 import type { SearchQuery, JobMatchStatus, UserProfile, Resume, User, JobFilters, ABTestStatus, ABTestCreateRequest, VariantCreateRequest, GenerateABVariantsRequest } from '@jobseeker/shared';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -598,5 +598,91 @@ export function useGenerateABVariants() {
         queryClient.invalidateQueries({ queryKey: ['abTests', variables.ab_test_id] });
       }
     },
+  });
+}
+
+// ============= Client Risk Hooks =============
+
+// Fetch risk assessment for a job
+export function useJobRisk(jobId: string, analyzeIfMissing: boolean = true) {
+  const { isAuthenticated } = useAuth();
+
+  return useQuery({
+    queryKey: ['jobRisk', jobId],
+    queryFn: () => clientRiskApi.getJobRisk(jobId, analyzeIfMissing),
+    enabled: !!jobId && isAuthenticated,
+  });
+}
+
+// Analyze a job for risk
+export function useAnalyzeJobRisk() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ jobId, forceRefresh }: { jobId: string; forceRefresh?: boolean }) =>
+      clientRiskApi.analyzeJob(jobId, forceRefresh),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['jobRisk', variables.jobId] });
+      queryClient.invalidateQueries({ queryKey: ['matchesRisk'] });
+      queryClient.invalidateQueries({ queryKey: ['riskStats'] });
+    },
+  });
+}
+
+// Batch analyze jobs
+export function useAnalyzeJobsBatch() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (jobIds: string[]) => clientRiskApi.analyzeJobsBatch(jobIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['jobRisk'] });
+      queryClient.invalidateQueries({ queryKey: ['matchesRisk'] });
+      queryClient.invalidateQueries({ queryKey: ['riskStats'] });
+    },
+  });
+}
+
+// Fetch risk for all user's matches
+export function useMatchesRisk(minScore: number = 0) {
+  const { isAuthenticated } = useAuth();
+
+  return useQuery({
+    queryKey: ['matchesRisk', minScore],
+    queryFn: () => clientRiskApi.getMatchesRisk(minScore),
+    enabled: isAuthenticated,
+  });
+}
+
+// Fetch company risk profile
+export function useCompanyRiskProfile(companyName: string) {
+  const { isAuthenticated } = useAuth();
+
+  return useQuery({
+    queryKey: ['companyRisk', companyName],
+    queryFn: () => clientRiskApi.getCompanyProfile(companyName),
+    enabled: !!companyName && isAuthenticated,
+  });
+}
+
+// List company risk profiles
+export function useCompanyRiskProfiles(riskLevel?: string, limit: number = 20) {
+  const { isAuthenticated } = useAuth();
+
+  return useQuery({
+    queryKey: ['companyRiskProfiles', riskLevel, limit],
+    queryFn: () => clientRiskApi.listCompanyProfiles(riskLevel, limit),
+    enabled: isAuthenticated,
+  });
+}
+
+// Fetch risk statistics
+export function useRiskStats() {
+  const { isAuthenticated } = useAuth();
+
+  return useQuery({
+    queryKey: ['riskStats'],
+    queryFn: () => clientRiskApi.getStats(),
+    enabled: isAuthenticated,
   });
 }

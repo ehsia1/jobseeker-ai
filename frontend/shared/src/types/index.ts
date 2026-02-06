@@ -859,3 +859,99 @@ export interface GenerateABVariantsResponse {
   variant_b: ProposalVariant;
   ab_test_id?: string;
 }
+
+// ============= Client Risk Types =============
+
+export type RiskLevel = 'low' | 'medium' | 'high' | 'critical';
+
+export type RiskCategory = 'payment' | 'expectations' | 'scope' | 'communication' | 'company' | 'legal' | 'reputation';
+
+export interface RedFlag {
+  category: RiskCategory;
+  flag: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  confidence: number;
+  source?: string;
+}
+
+export interface GreenFlag {
+  category: RiskCategory;
+  flag: string;
+  confidence: number;
+  source?: string;
+}
+
+export interface RiskBreakdownCategory {
+  score: number;
+  factors: string[];
+}
+
+export interface ClientRiskAssessment {
+  id: string;
+  job_id: string;
+
+  // Overall assessment
+  risk_score: number;
+  risk_level: RiskLevel;
+
+  // Detailed breakdown
+  risk_breakdown: Record<RiskCategory, RiskBreakdownCategory>;
+  red_flags: RedFlag[];
+  green_flags: GreenFlag[];
+
+  // User-friendly content
+  summary?: string;
+  recommendations: string[];
+
+  // Company context
+  company_name?: string;
+  company_risk_trend?: 'improving' | 'stable' | 'declining';
+
+  // Metadata
+  analysis_method: string;
+  analyzed_at: string;
+}
+
+export interface ClientRiskBrief {
+  job_id: string;
+  risk_score: number;
+  risk_level: RiskLevel;
+  top_concern?: string;
+  analyzed_at: string;
+}
+
+export interface CompanyRiskProfile {
+  id: string;
+  company_name: string;
+
+  // Aggregated scores
+  average_risk_score: number;
+  risk_level: RiskLevel;
+  total_jobs_analyzed: number;
+
+  // Patterns
+  common_red_flags: Array<{ flag: string; count: number; percentage: number }>;
+  common_green_flags: Array<{ flag: string; count: number; percentage: number }>;
+
+  // Trend
+  risk_trend?: 'improving' | 'stable' | 'declining';
+  risk_history: Array<{ date: string; score: number }>;
+
+  // User feedback
+  user_reports: number;
+  positive_outcomes: number;
+  negative_outcomes: number;
+
+  // External data
+  external_ratings: Record<string, any>;
+
+  first_seen: string;
+  last_updated: string;
+}
+
+export interface RiskStats {
+  total_analyzed: number;
+  average_risk_score: number;
+  risk_distribution: Record<RiskLevel, number>;
+  top_concerns: Array<{ concern: string; count: number }>;
+}

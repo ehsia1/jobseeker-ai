@@ -29,6 +29,7 @@ import { useCoverLetter, useInterviewPrep, useSalaryResearch, useSkillGap, useNe
 import { ScoreBreakdownBar } from '../../src/components/ScoreBadge';
 import { AgentLoadingState } from '../../src/components/AgentLoadingState';
 import { ProposalABTest } from '../../src/components/ProposalABTest';
+import { ClientRiskCard } from '../../src/components/ClientRiskCard';
 import { matchesApi, proposalsApi } from '../../src/api/client';
 import type { ScoredJob, JobMatchStatus, InterviewQuestion, SalaryRange, SkillGapItem, CoverLetterStyle } from '@jobseeker/shared';
 
@@ -377,6 +378,14 @@ export default function JobDetailsScreen() {
             )}
           </Surface>
         )}
+
+        {/* Client Risk Assessment */}
+        <View style={styles.section}>
+          <Text variant="titleMedium" style={styles.sectionTitle}>
+            Client Risk Assessment
+          </Text>
+          <ClientRiskCard jobId={id} compact={false} />
+        </View>
 
         {/* Description */}
         <Surface style={styles.section}>
