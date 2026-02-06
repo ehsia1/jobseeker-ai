@@ -315,3 +315,47 @@ export function useSubscription() {
     enabled: isAuthenticated,
   });
 }
+
+// ============= Digest Settings Hooks =============
+import { digestApi, DigestSettings } from '../api/client';
+
+// Fetch digest settings
+export function useDigestSettings() {
+  const { isAuthenticated } = useAuth();
+
+  return useQuery({
+    queryKey: ['digestSettings'],
+    queryFn: () => digestApi.getSettings(),
+    enabled: isAuthenticated,
+  });
+}
+
+// Update digest settings
+export function useUpdateDigestSettings() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (settings: Partial<DigestSettings>) => digestApi.updateSettings(settings),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['digestSettings'] });
+    },
+  });
+}
+
+// Get digest preview
+export function useDigestPreview() {
+  const { isAuthenticated } = useAuth();
+
+  return useQuery({
+    queryKey: ['digestPreview'],
+    queryFn: () => digestApi.getPreview(),
+    enabled: false, // Only fetch when explicitly requested
+  });
+}
+
+// Send digest now
+export function useSendDigest() {
+  return useMutation({
+    mutationFn: () => digestApi.sendNow(),
+  });
+}

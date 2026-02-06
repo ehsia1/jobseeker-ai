@@ -18,7 +18,7 @@ import { useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/contexts/AuthContext';
-import { useProfile, useUpdateProfile, useUploadResume, useReparseResume, useSubmitResumeText } from '../../src/hooks/useJobs';
+import { useProfile, useUpdateProfile, useUploadResume, useReparseResume, useSubmitResumeText, useDigestSettings, useUpdateDigestSettings } from '../../src/hooks/useJobs';
 import { API_URL } from '../../src/api/client';
 
 // Get full avatar URL from relative path
@@ -57,6 +57,19 @@ export default function ProfileScreen() {
 
   // Resume Optimizer agent
   const resumeOptimize = useResumeOptimizer();
+
+  // Digest settings
+  const { data: digestSettings, isLoading: isLoadingDigest } = useDigestSettings();
+  const updateDigestSettings = useUpdateDigestSettings();
+
+  const handleToggleDigest = async () => {
+    const newValue = !digestSettings?.enabled;
+    try {
+      await updateDigestSettings.mutateAsync({ enabled: newValue });
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to update digest settings');
+    }
+  };
 
   const handleLogout = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -464,6 +477,23 @@ export default function ProfileScreen() {
             <Switch
               value={pushNotifications}
               onValueChange={setPushNotifications}
+            />
+          )}
+        />
+        <Divider />
+        <List.Item
+          title="Daily Digest Email"
+          description={
+            digestSettings?.enabled
+              ? `${digestSettings.frequency === 'daily' ? 'Daily' : 'Weekly'} at ${digestSettings.preferred_time || '10:00 AM'}`
+              : 'Disabled'
+          }
+          left={(props) => <List.Icon {...props} icon="email-newsletter" />}
+          right={() => (
+            <Switch
+              value={digestSettings?.enabled ?? true}
+              onValueChange={handleToggleDigest}
+              disabled={updateDigestSettings.isPending}
             />
           )}
         />

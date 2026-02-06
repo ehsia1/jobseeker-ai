@@ -15,9 +15,19 @@ from backend.config import settings
 from backend.database import get_db
 from backend.models.user import User, UserProfile
 from backend.models.notification import Notification
-from backend.api.schemas.user import UserRead, UserProfileRead, UserProfileUpdate, UserWithProfile, UserContactUpdate
+from backend.api.schemas.user import (
+    UserRead,
+    UserProfileRead,
+    UserProfileUpdate,
+    UserWithProfile,
+    UserContactUpdate,
+    DigestSettings,
+    DigestSettingsUpdate,
+    DigestPreview,
+)
 from backend.api.schemas.notification import NotificationRead
 from backend.api.routes.auth import get_current_user
+from backend.services.digest_service import DigestService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -331,3 +341,144 @@ async def mark_all_notifications_read(
     await db.commit()
 
     return {"message": "All notifications marked as read"}
+
+
+# Digest Settings Routes
+
+
+@router.get("/me/digest/settings", response_model=DigestSettings)
+async def get_digest_settings(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get current user's digest notification settings."""
+
+    result = await db.execute(
+        select(UserProfile).where(UserProfile.user_id == current_user.id)
+    )
+    profile = result.scalar_one_or_none()
+
+    if not profile:
+        # Return default settings if no profile exists
+        return DigestSettings()
+
+    # Extract digest settings from preferences
+    preferences = profile.preferences or {}
+    digest_prefs = preferences.get("digest", {})
+
+    return DigestSettings(
+        enabled=digest_prefs.get("enabled", True),
+        frequency=digest_prefs.get("frequency", "daily"),
+        min_match_score=digest_prefs.get("min_match_score", 70),
+        max_jobs=digest_prefs.get("max_jobs", 10),
+        include_applied=digest_prefs.get("include_applied", False),
+        preferred_time=digest_prefs.get("preferred_time", "10:00"),
+    )
+
+
+@router.put("/me/digest/settings", response_model=DigestSettings)
+async def update_digest_settings(
+    settings_data: DigestSettingsUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Update current user's digest notification settings."""
+
+    result = await db.execute(
+        select(UserProfile).where(UserProfile.user_id == current_user.id)
+    )
+    profile = result.scalar_one_or_none()
+
+    if not profile:
+        # Create profile if it doesn't exist
+        profile = UserProfile(user_id=current_user.id, preferences={})
+        db.add(profile)
+
+    # Get current preferences
+    preferences = dict(profile.preferences or {})
+    digest_prefs = dict(preferences.get("digest", {}))
+
+    # Update only provided fields
+    update_data = settings_data.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        digest_prefs[key] = value
+
+    # Save back to preferences
+    preferences["digest"] = digest_prefs
+    profile.preferences = preferences
+
+    await db.commit()
+    await db.refresh(profile)
+
+    return DigestSettings(
+        enabled=digest_prefs.get("enabled", True),
+        frequency=digest_prefs.get("frequency", "daily"),
+        min_match_score=digest_prefs.get("min_match_score", 70),
+        max_jobs=digest_prefs.get("max_jobs", 10),
+        include_applied=digest_prefs.get("include_applied", False),
+        preferred_time=digest_prefs.get("preferred_time", "10:00"),
+    )
+
+
+@router.get("/me/digest/preview", response_model=DigestPreview)
+async def preview_digest(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Preview what the daily digest email would look like."""
+
+    digest_service = DigestService(db)
+
+    try:
+        preview = await digest_service.preview_digest(current_user.id)
+        return DigestPreview(
+            html_content=preview["html_content"],
+            matches_count=preview["matches_count"],
+            stats=preview["stats"],
+        )
+    except Exception as e:
+        logger.error(f"Failed to generate digest preview: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate digest preview"
+        )
+
+
+@router.post("/me/digest/send")
+async def send_digest_now(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Send the daily digest email to the current user immediately."""
+
+    from sqlalchemy.orm import joinedload
+
+    # Get user with profile
+    result = await db.execute(
+        select(User)
+        .options(joinedload(User.profile))
+        .where(User.id == current_user.id)
+    )
+    user = result.unique().scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    digest_service = DigestService(db)
+
+    try:
+        success = await digest_service.send_digest_to_user(user)
+
+        if success:
+            return {"message": "Digest sent successfully", "status": "sent"}
+        else:
+            return {"message": "Failed to send digest - check SMTP configuration", "status": "failed"}
+    except Exception as e:
+        logger.error(f"Failed to send digest: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to send digest: {str(e)}"
+        )

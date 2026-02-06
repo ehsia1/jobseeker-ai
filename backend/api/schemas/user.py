@@ -95,3 +95,55 @@ class UserProfileRead(UserProfileBase):
 class UserWithProfile(UserRead):
     """User with profile schema."""
     profile: Optional[UserProfileRead] = None
+
+
+# Digest Settings Schemas
+
+
+class DigestSettings(BaseModel):
+    """User's digest notification settings."""
+    enabled: bool = True
+    frequency: str = Field(
+        default="daily",
+        description="Digest frequency: 'daily' or 'weekly'"
+    )
+    min_match_score: int = Field(
+        default=70,
+        ge=0,
+        le=100,
+        description="Minimum match score to include in digest"
+    )
+    max_jobs: int = Field(
+        default=10,
+        ge=1,
+        le=50,
+        description="Maximum jobs to include in digest"
+    )
+    include_applied: bool = Field(
+        default=False,
+        description="Include jobs already applied to"
+    )
+    preferred_time: str = Field(
+        default="10:00",
+        description="Preferred digest time (HH:MM format)"
+    )
+
+
+class DigestSettingsUpdate(BaseModel):
+    """Update schema for digest settings."""
+    enabled: Optional[bool] = None
+    frequency: Optional[str] = Field(
+        default=None,
+        pattern="^(daily|weekly)$"
+    )
+    min_match_score: Optional[int] = Field(None, ge=0, le=100)
+    max_jobs: Optional[int] = Field(None, ge=1, le=50)
+    include_applied: Optional[bool] = None
+    preferred_time: Optional[str] = None
+
+
+class DigestPreview(BaseModel):
+    """Digest preview response."""
+    html_content: str
+    matches_count: int
+    stats: Dict

@@ -472,6 +472,49 @@ export const subscriptionApi = {
   },
 };
 
+// Digest Settings types
+export interface DigestSettings {
+  enabled: boolean;
+  frequency: 'daily' | 'weekly';
+  min_match_score: number;
+  max_jobs: number;
+  include_applied: boolean;
+  preferred_time: string;
+}
+
+export interface DigestPreview {
+  html_content: string;
+  matches_count: number;
+  stats: {
+    total_new: number;
+    high_quality_count: number;
+    applied_count: number;
+    average_score: number;
+  };
+}
+
+// Digest API
+export const digestApi = {
+  async getSettings(): Promise<DigestSettings> {
+    return apiFetch('/users/me/digest/settings');
+  },
+
+  async updateSettings(settings: Partial<DigestSettings>): Promise<DigestSettings> {
+    return apiFetch('/users/me/digest/settings', {
+      method: 'PUT',
+      body: JSON.stringify(settings),
+    });
+  },
+
+  async getPreview(): Promise<DigestPreview> {
+    return apiFetch('/users/me/digest/preview');
+  },
+
+  async sendNow(): Promise<{ message: string; status: string }> {
+    return apiFetch('/users/me/digest/send', { method: 'POST' });
+  },
+};
+
 // Health check
 export const healthApi = {
   async check(): Promise<{ status: string; timestamp: string }> {
