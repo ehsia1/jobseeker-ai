@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Alert,
   TouchableOpacity,
+  AccessibilityInfo,
 } from 'react-native';
 import { Text, Searchbar, Chip, ProgressBar, Button, Portal, Modal, IconButton, TextInput } from 'react-native-paper';
 import { useRouter } from 'expo-router';
@@ -14,6 +15,32 @@ import { useJobsInfinite, useMatchesInfinite, useSaveJob } from '../../src/hooks
 import { useJobRadar } from '../../src/hooks/useAgent';
 import JobCard from '../../src/components/JobCard';
 import type { Job, ScoredJob, JobRadarMatch, JobFilters } from '@jobseeker/shared';
+
+// Score color coding helper
+const getScoreColor = (score: number): { bg: string; text: string; label: string } => {
+  if (score >= 85) return { bg: '#dcfce7', text: '#166534', label: 'Excellent match' };
+  if (score >= 70) return { bg: '#dbeafe', text: '#1d4ed8', label: 'Good match' };
+  if (score >= 55) return { bg: '#fef3c7', text: '#92400e', label: 'Fair match' };
+  return { bg: '#fee2e2', text: '#dc2626', label: 'Low match' };
+};
+
+// Radar step mapping for progress display
+const RADAR_STEPS = [
+  { pattern: /starting|initializing/i, step: 1, total: 5 },
+  { pattern: /fetching|loading jobs/i, step: 2, total: 5 },
+  { pattern: /analyzing|scoring/i, step: 3, total: 5 },
+  { pattern: /ranking|sorting/i, step: 4, total: 5 },
+  { pattern: /finalizing|complet/i, step: 5, total: 5 },
+];
+
+const getStepInfo = (currentStep: string): { step: number; total: number } | null => {
+  for (const { pattern, step, total } of RADAR_STEPS) {
+    if (pattern.test(currentStep)) {
+      return { step, total };
+    }
+  }
+  return null;
+};
 
 export default function JobFeedScreen() {
   const router = useRouter();
@@ -199,13 +226,16 @@ export default function JobFeedScreen() {
           style={styles.searchbar}
           inputStyle={styles.searchInput}
         />
-        <View style={styles.filters}>
+        <View style={styles.filters} accessibilityRole="toolbar" accessibilityLabel="Job filters">
           <Chip
             selected={remoteOnly}
             onPress={() => setRemoteOnly(!remoteOnly)}
             style={styles.chip}
             textStyle={styles.chipText}
             showSelectedOverlay
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: remoteOnly }}
+            accessibilityLabel="Filter by remote only jobs"
           >
             Remote Only
           </Chip>
@@ -214,6 +244,10 @@ export default function JobFeedScreen() {
             onPress={() => setShowFilters(!showFilters)}
             style={[styles.chip, hasActiveFilters && styles.activeFilterChip]}
             textStyle={styles.chipText}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: showFilters }}
+            accessibilityLabel={`Advanced filters${hasActiveFilters ? ', active' : ''}`}
+            accessibilityHint="Tap to expand filter options"
           >
             Filters{hasActiveFilters ? ' •' : ''}
           </Chip>
@@ -225,6 +259,9 @@ export default function JobFeedScreen() {
             labelStyle={styles.radarButtonLabel}
             icon="radar"
             compact
+            accessibilityRole="button"
+            accessibilityLabel={jobRadar.isRunning ? 'Job Radar scanning in progress' : 'Run Job Radar to find matching jobs'}
+            accessibilityHint="AI-powered job matching based on your profile"
           >
             {jobRadar.isRunning ? 'Scanning...' : 'Job Radar'}
           </Button>
@@ -310,13 +347,31 @@ export default function JobFeedScreen() {
 
         {/* Job Radar Progress Banner */}
         {jobRadar.isRunning && (
-          <View style={styles.radarBanner}>
+          <View
+            style={styles.radarBanner}
+            accessible={true}
+            accessibilityRole="progressbar"
+            accessibilityLabel={`Job Radar scanning: ${jobRadar.progress}% complete`}
+            accessibilityValue={{ now: jobRadar.progress, min: 0, max: 100 }}
+          >
             <View style={styles.radarBannerContent}>
               <ActivityIndicator size="small" color="#3b82f6" />
               <View style={styles.radarBannerText}>
-                <Text variant="bodySmall" style={styles.radarStep}>
-                  {jobRadar.currentStep || 'Starting radar scan...'}
-                </Text>
+                {(() => {
+                  const stepInfo = getStepInfo(jobRadar.currentStep);
+                  return (
+                    <>
+                      {stepInfo && (
+                        <Text variant="labelSmall" style={styles.radarStepNumber}>
+                          Step {stepInfo.step} of {stepInfo.total}
+                        </Text>
+                      )}
+                      <Text variant="bodySmall" style={styles.radarStep}>
+                        {jobRadar.currentStep || 'Starting radar scan...'}
+                      </Text>
+                    </>
+                  );
+                })()}
               </View>
             </View>
             <ProgressBar
@@ -332,35 +387,97 @@ export default function JobFeedScreen() {
           <TouchableOpacity
             style={styles.radarCompleteBanner}
             onPress={() => setRadarModalVisible(true)}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel={`Job Radar found ${jobRadar.result.matches_found} matches. Tap to view results.`}
+            accessibilityHint="Opens the results modal with all matches"
           >
-            <Text variant="bodyMedium" style={styles.radarCompleteText}>
-              Found {jobRadar.result.matches_found} matches! Tap to view
-            </Text>
-            <Button
-              mode="text"
-              onPress={() => jobRadar.reset()}
-              compact
-              labelStyle={styles.dismissLabel}
-            >
-              Dismiss
-            </Button>
+            <View style={styles.radarCompleteContent}>
+              <View style={styles.radarCompleteMain}>
+                <Text variant="bodyMedium" style={styles.radarCompleteText}>
+                  Found {jobRadar.result.matches_found} matches!
+                </Text>
+                {/* Top match preview */}
+                {jobRadar.result.top_matches.length > 0 && (
+                  <View style={styles.topMatchPreview}>
+                    <Text variant="bodySmall" style={styles.topMatchLabel}>
+                      Top match:
+                    </Text>
+                    <Text variant="bodySmall" style={styles.topMatchTitle} numberOfLines={1}>
+                      {jobRadar.result.top_matches[0].title}
+                    </Text>
+                    <View style={[
+                      styles.topMatchScore,
+                      { backgroundColor: getScoreColor(jobRadar.result.top_matches[0].score).bg }
+                    ]}>
+                      <Text style={[
+                        styles.topMatchScoreText,
+                        { color: getScoreColor(jobRadar.result.top_matches[0].score).text }
+                      ]}>
+                        {jobRadar.result.top_matches[0].score}%
+                      </Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+              <View style={styles.radarCompleteActions}>
+                <Button
+                  mode="text"
+                  onPress={() => setRadarModalVisible(true)}
+                  compact
+                  labelStyle={styles.viewAllLabel}
+                >
+                  View All
+                </Button>
+                <Button
+                  mode="text"
+                  onPress={() => jobRadar.reset()}
+                  compact
+                  labelStyle={styles.dismissLabel}
+                >
+                  Dismiss
+                </Button>
+              </View>
+            </View>
           </TouchableOpacity>
         )}
 
         {/* Job Radar Error Banner */}
         {jobRadar.isFailed && (
-          <View style={styles.radarErrorBanner}>
-            <Text variant="bodySmall" style={styles.radarErrorText}>
-              Radar scan failed: {jobRadar.errors[0] || 'Unknown error'}
-            </Text>
-            <Button
-              mode="text"
-              onPress={() => jobRadar.reset()}
-              compact
-              labelStyle={styles.dismissLabel}
-            >
-              Dismiss
-            </Button>
+          <View
+            style={styles.radarErrorBanner}
+            accessible={true}
+            accessibilityRole="alert"
+            accessibilityLabel={`Job Radar scan failed: ${jobRadar.errors[0] || 'Unknown error'}`}
+          >
+            <View style={styles.radarErrorContent}>
+              <Text variant="bodySmall" style={styles.radarErrorText}>
+                Radar scan failed: {jobRadar.errors[0] || 'Unknown error'}
+              </Text>
+              <Text variant="bodySmall" style={styles.radarErrorHint}>
+                This might be a temporary issue. Try again or adjust your filters.
+              </Text>
+            </View>
+            <View style={styles.radarErrorActions}>
+              <Button
+                mode="contained"
+                onPress={handleRunRadar}
+                compact
+                style={styles.retryButton}
+                labelStyle={styles.retryButtonLabel}
+                icon="refresh"
+              >
+                Retry
+              </Button>
+              <Button
+                mode="text"
+                onPress={() => jobRadar.reset()}
+                compact
+                labelStyle={styles.dismissLabel}
+              >
+                Dismiss
+              </Button>
+            </View>
           </View>
         )}
       </View>
@@ -408,7 +525,12 @@ export default function JobFeedScreen() {
             <Text variant="titleLarge" style={styles.modalTitle}>
               Job Radar Results
             </Text>
-            <TouchableOpacity onPress={() => setRadarModalVisible(false)}>
+            <TouchableOpacity
+              onPress={() => setRadarModalVisible(false)}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Close results modal"
+            >
               <Text style={styles.modalClose}>✕</Text>
             </TouchableOpacity>
           </View>
@@ -416,7 +538,7 @@ export default function JobFeedScreen() {
           {jobRadar.result && (
             <>
               <View style={styles.modalStats}>
-                <View style={styles.statItem}>
+                <View style={styles.statItem} accessible={true} accessibilityLabel={`${jobRadar.result.jobs_found} jobs scanned`}>
                   <Text variant="headlineMedium" style={styles.statNumber}>
                     {jobRadar.result.jobs_found}
                   </Text>
@@ -424,7 +546,7 @@ export default function JobFeedScreen() {
                     Jobs Scanned
                   </Text>
                 </View>
-                <View style={styles.statItem}>
+                <View style={styles.statItem} accessible={true} accessibilityLabel={`${jobRadar.result.matches_found} matches found`}>
                   <Text variant="headlineMedium" style={styles.statNumber}>
                     {jobRadar.result.matches_found}
                   </Text>
@@ -434,36 +556,96 @@ export default function JobFeedScreen() {
                 </View>
               </View>
 
+              {/* Score Legend */}
+              <View style={styles.scoreLegend}>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: '#166534' }]} />
+                  <Text variant="labelSmall" style={styles.legendText}>85%+ Excellent</Text>
+                </View>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: '#1d4ed8' }]} />
+                  <Text variant="labelSmall" style={styles.legendText}>70%+ Good</Text>
+                </View>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: '#92400e' }]} />
+                  <Text variant="labelSmall" style={styles.legendText}>55%+ Fair</Text>
+                </View>
+              </View>
+
               <FlatList
                 data={jobRadar.result.top_matches}
                 keyExtractor={(item) => item.job_id}
                 style={styles.matchesList}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.matchItem}
-                    onPress={() => handleRadarJobPress(item)}
-                  >
-                    <View style={styles.matchHeader}>
-                      <Text variant="bodyLarge" style={styles.matchTitle} numberOfLines={1}>
-                        {item.title}
-                      </Text>
-                      <View style={styles.matchScore}>
-                        <Text variant="labelMedium" style={styles.scoreText}>
-                          {item.score}%
+                renderItem={({ item }) => {
+                  const scoreColors = getScoreColor(item.score);
+                  const isAlreadySaved = savedJobIds.has(item.job_id);
+                  return (
+                    <View
+                      style={styles.matchItem}
+                      accessible={true}
+                      accessibilityLabel={`${item.title} at ${item.company}, ${item.score}% match. ${scoreColors.label}`}
+                    >
+                      <TouchableOpacity
+                        onPress={() => handleRadarJobPress(item)}
+                        style={styles.matchContent}
+                      >
+                        <View style={styles.matchHeader}>
+                          <Text variant="bodyLarge" style={styles.matchTitle} numberOfLines={1}>
+                            {item.title}
+                          </Text>
+                          <View style={[styles.matchScore, { backgroundColor: scoreColors.bg }]}>
+                            <Text variant="labelMedium" style={[styles.scoreText, { color: scoreColors.text }]}>
+                              {item.score}%
+                            </Text>
+                          </View>
+                        </View>
+                        <Text variant="bodySmall" style={styles.matchCompany} numberOfLines={1}>
+                          {item.company} {item.location && `• ${item.location}`}
+                          {item.remote && ' • Remote'}
                         </Text>
+                        {item.explanation && (
+                          <Text variant="bodySmall" style={styles.matchExplanation} numberOfLines={3}>
+                            {item.explanation}
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                      {/* Action buttons */}
+                      <View style={styles.matchActions}>
+                        <Button
+                          mode="outlined"
+                          onPress={() => {
+                            if (!isAlreadySaved) {
+                              saveJobMutation.mutate(item.job_id, {
+                                onSuccess: () => Alert.alert('Saved!', 'Job added to your matches.'),
+                                onError: (err) => Alert.alert('Error', err.message),
+                              });
+                            }
+                          }}
+                          compact
+                          style={[styles.matchActionButton, isAlreadySaved && styles.matchActionButtonDisabled]}
+                          labelStyle={styles.matchActionLabel}
+                          icon={isAlreadySaved ? 'check' : 'bookmark-outline'}
+                          disabled={isAlreadySaved}
+                        >
+                          {isAlreadySaved ? 'Saved' : 'Save'}
+                        </Button>
+                        <Button
+                          mode="contained"
+                          onPress={() => {
+                            setRadarModalVisible(false);
+                            router.push(`/job/${item.job_id}?action=apply`);
+                          }}
+                          compact
+                          style={styles.matchActionButton}
+                          labelStyle={styles.matchActionLabel}
+                          icon="send"
+                        >
+                          Apply
+                        </Button>
                       </View>
                     </View>
-                    <Text variant="bodySmall" style={styles.matchCompany} numberOfLines={1}>
-                      {item.company} {item.location && `• ${item.location}`}
-                      {item.remote && ' • Remote'}
-                    </Text>
-                    {item.explanation && (
-                      <Text variant="bodySmall" style={styles.matchExplanation} numberOfLines={3}>
-                        {item.explanation}
-                      </Text>
-                    )}
-                  </TouchableOpacity>
-                )}
+                  );
+                }}
                 ListEmptyComponent={
                   <Text style={styles.noMatches}>No high-scoring matches found</Text>
                 }
@@ -639,6 +821,11 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     flex: 1,
   },
+  radarStepNumber: {
+    color: '#3b82f6',
+    fontWeight: '600',
+    marginBottom: 2,
+  },
   radarStep: {
     color: '#1e40af',
   },
@@ -652,26 +839,81 @@ const styles = StyleSheet.create({
     backgroundColor: '#dcfce7',
     borderRadius: 8,
     padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  },
+  radarCompleteContent: {
+    flexDirection: 'column',
+  },
+  radarCompleteMain: {
+    marginBottom: 8,
   },
   radarCompleteText: {
     color: '#166534',
+    fontWeight: '600',
+  },
+  topMatchPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    flexWrap: 'wrap',
+  },
+  topMatchLabel: {
+    color: '#15803d',
+    marginRight: 4,
+  },
+  topMatchTitle: {
+    color: '#166534',
     flex: 1,
+    fontWeight: '500',
+  },
+  topMatchScore: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginLeft: 8,
+  },
+  topMatchScoreText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  radarCompleteActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+  },
+  viewAllLabel: {
+    fontSize: 12,
+    color: '#166534',
   },
   radarErrorBanner: {
     marginTop: 8,
     backgroundColor: '#fef2f2',
     borderRadius: 8,
     padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  },
+  radarErrorContent: {
+    marginBottom: 8,
   },
   radarErrorText: {
     color: '#dc2626',
-    flex: 1,
+    fontWeight: '500',
+  },
+  radarErrorHint: {
+    color: '#b91c1c',
+    marginTop: 4,
+    fontSize: 12,
+  },
+  radarErrorActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 8,
+  },
+  retryButton: {
+    backgroundColor: '#dc2626',
+  },
+  retryButtonLabel: {
+    fontSize: 12,
+    color: '#fff',
   },
   dismissLabel: {
     fontSize: 12,
@@ -717,6 +959,30 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     marginTop: 4,
   },
+  scoreLegend: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: '#f9fafb',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  legendText: {
+    color: '#6b7280',
+    fontSize: 10,
+  },
   matchesList: {
     maxHeight: 400,
   },
@@ -724,6 +990,9 @@ const styles = StyleSheet.create({
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#f3f4f6',
+  },
+  matchContent: {
+    marginBottom: 12,
   },
   matchHeader: {
     flexDirection: 'row',
@@ -746,15 +1015,28 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   matchScore: {
-    backgroundColor: '#dbeafe',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
     marginLeft: 12,
   },
   scoreText: {
-    color: '#1d4ed8',
     fontWeight: '600',
+  },
+  matchActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+  },
+  matchActionButton: {
+    borderRadius: 6,
+  },
+  matchActionButtonDisabled: {
+    opacity: 0.6,
+  },
+  matchActionLabel: {
+    fontSize: 12,
+    marginHorizontal: 4,
   },
   noMatches: {
     padding: 24,
