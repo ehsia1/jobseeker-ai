@@ -16,6 +16,7 @@ from backend.api.schemas.resume import (
     ResumeResponse,
     ResumeTextRequest,
     ResumeUploadResponse,
+    ResumeUpdateRequest,
     ResumeSummary,
     WorkExperienceResponse,
     EducationEntry,
@@ -335,6 +336,59 @@ async def delete_resume(
 
     await db.commit()
     return None
+
+
+@router.put("", response_model=ResumeResponse)
+async def update_resume(
+    request: ResumeUpdateRequest,
+    current_user: User = Depends(get_current_user_or_demo),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update resume fields manually.
+
+    Allows editing contact information, skills, and other fields
+    without re-uploading or re-parsing the entire resume.
+
+    Work experience and education cannot be edited via this endpoint.
+    To update those, upload a new resume or paste updated text.
+    """
+    service = ResumeService(db)
+    resume = await service.get_resume(current_user.id)
+
+    if resume is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No resume found. Please upload a resume first.",
+        )
+
+    # Update allowed fields
+    update_data = request.model_dump(exclude_unset=True)
+
+    if "full_name" in update_data:
+        resume.full_name = update_data["full_name"]
+    if "email" in update_data:
+        resume.email = update_data["email"]
+    if "phone" in update_data:
+        resume.phone = update_data["phone"]
+    if "location" in update_data:
+        resume.location = update_data["location"]
+    if "summary" in update_data:
+        resume.summary = update_data["summary"]
+    if "linkedin_url" in update_data:
+        resume.linkedin_url = update_data["linkedin_url"]
+    if "github_url" in update_data:
+        resume.github_url = update_data["github_url"]
+    if "portfolio_url" in update_data:
+        resume.portfolio_url = update_data["portfolio_url"]
+    if "skills" in update_data:
+        resume.skills = update_data["skills"]
+
+    await db.commit()
+    await db.refresh(resume)
+
+    logger.info(f"Resume updated manually for user {current_user.id}")
+
+    return _resume_to_response(resume)
 
 
 @router.post("/reparse", response_model=ResumeUploadResponse)

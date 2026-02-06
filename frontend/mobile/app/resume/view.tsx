@@ -97,6 +97,9 @@ export default function ResumeViewScreen() {
           headerLeft: () => (
             <IconButton icon="arrow-left" onPress={() => router.back()} />
           ),
+          headerRight: () => (
+            <IconButton icon="pencil" onPress={() => router.push('/resume/edit' as any)} />
+          ),
         }}
       />
 

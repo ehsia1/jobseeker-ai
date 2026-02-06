@@ -366,42 +366,167 @@ export const usersApi = {
 };
 
 // Resume API
+const MAX_RESUME_SIZE = 10 * 1024 * 1024; // 10MB
+const ALLOWED_RESUME_TYPES = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'text/plain',
+];
+
+export interface ResumeUploadOptions {
+  onProgress?: (progress: number) => void;
+}
+
+// Resume upload error types for better user feedback
+export class ResumeUploadError extends Error {
+  code: string;
+  constructor(message: string, code: string) {
+    super(message);
+    this.code = code;
+    this.name = 'ResumeUploadError';
+  }
+}
+
 export const resumeApi = {
   async getResume(): Promise<Resume> {
     return apiFetch('/resume');
   },
 
-  async uploadResume(file: {
-    uri: string;
-    name: string;
-    type: string;
-  }): Promise<{ message: string; resume: Resume }> {
-    const token = await getToken();
-    const formData = new FormData();
-    formData.append('file', {
-      uri: file.uri,
-      name: file.name,
-      type: file.type,
-    } as any);
-
-    const response = await fetch(`${API_URL}/resume/upload`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Upload failed' }));
-      throw new Error(error.detail || 'Upload failed');
+  validateResumeFile(file: { uri: string; name: string; type: string; size?: number }): void {
+    // Validate file type
+    if (!ALLOWED_RESUME_TYPES.includes(file.type)) {
+      const ext = file.name.split('.').pop()?.toLowerCase();
+      // Also check by extension as MIME type may be unreliable
+      const validExtensions = ['pdf', 'doc', 'docx', 'txt'];
+      if (!ext || !validExtensions.includes(ext)) {
+        throw new ResumeUploadError(
+          'Invalid file type. Please upload a PDF, Word document (.doc, .docx), or text file.',
+          'INVALID_FILE_TYPE'
+        );
+      }
     }
 
-    return response.json();
+    // Validate file size if available
+    if (file.size && file.size > MAX_RESUME_SIZE) {
+      const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
+      throw new ResumeUploadError(
+        `File too large (${sizeMB}MB). Maximum size is 10MB.`,
+        'FILE_TOO_LARGE'
+      );
+    }
+  },
+
+  async uploadResume(
+    file: { uri: string; name: string; type: string; size?: number },
+    options?: ResumeUploadOptions
+  ): Promise<{ message: string; resume: Resume }> {
+    // Validate file before upload
+    this.validateResumeFile(file);
+
+    const token = await getToken();
+    if (!token) {
+      throw new ResumeUploadError('Not authenticated. Please log in again.', 'NOT_AUTHENTICATED');
+    }
+
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+
+      // Track upload progress
+      if (options?.onProgress) {
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            const progress = Math.round((event.loaded / event.total) * 100);
+            options.onProgress!(progress);
+          }
+        };
+      }
+
+      xhr.onload = async () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const response = JSON.parse(xhr.responseText);
+            resolve(response);
+          } catch {
+            reject(new ResumeUploadError('Invalid response from server', 'PARSE_ERROR'));
+          }
+        } else {
+          // Parse error response
+          try {
+            const error = JSON.parse(xhr.responseText);
+            const message = error.detail || 'Upload failed';
+
+            // Map specific error codes
+            if (xhr.status === 413) {
+              reject(new ResumeUploadError('File too large. Maximum size is 10MB.', 'FILE_TOO_LARGE'));
+            } else if (xhr.status === 415) {
+              reject(new ResumeUploadError('Invalid file type. Please upload a PDF or Word document.', 'INVALID_FILE_TYPE'));
+            } else if (xhr.status === 401) {
+              reject(new ResumeUploadError('Session expired. Please log in again.', 'NOT_AUTHENTICATED'));
+            } else if (message.includes('extract') || message.includes('parse')) {
+              reject(new ResumeUploadError(
+                'Could not read your resume. Try a simpler PDF format or paste your resume text directly.',
+                'EXTRACTION_FAILED'
+              ));
+            } else {
+              reject(new ResumeUploadError(message, 'UPLOAD_FAILED'));
+            }
+          } catch {
+            reject(new ResumeUploadError('Upload failed. Please try again.', 'UPLOAD_FAILED'));
+          }
+        }
+      };
+
+      xhr.onerror = () => {
+        reject(new ResumeUploadError(
+          'Network error. Please check your connection and try again.',
+          'NETWORK_ERROR'
+        ));
+      };
+
+      xhr.ontimeout = () => {
+        reject(new ResumeUploadError(
+          'Upload timed out. Please try again with a smaller file or better connection.',
+          'TIMEOUT'
+        ));
+      };
+
+      // Set timeout to 2 minutes for large files
+      xhr.timeout = 120000;
+
+      xhr.open('POST', `${API_URL}/resume/upload`);
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
+      const formData = new FormData();
+      formData.append('file', {
+        uri: file.uri,
+        name: file.name,
+        type: file.type,
+      } as any);
+
+      xhr.send(formData);
+    });
   },
 
   async deleteResume(): Promise<{ message: string }> {
     return apiFetch('/resume', { method: 'DELETE' });
+  },
+
+  async updateResume(data: {
+    full_name?: string;
+    email?: string;
+    phone?: string;
+    location?: string;
+    summary?: string;
+    linkedin_url?: string;
+    github_url?: string;
+    portfolio_url?: string;
+    skills?: string[];
+  }): Promise<Resume> {
+    return apiFetch('/resume', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
   },
 
   async reparseResume(): Promise<{ message: string; resume: Resume }> {

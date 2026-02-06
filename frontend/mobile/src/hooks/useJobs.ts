@@ -158,7 +158,8 @@ export function useUpdateProfile() {
 }
 
 // ============= Resume Hooks =============
-import { resumeApi } from '../api/client';
+import { resumeApi, ResumeUploadError } from '../api/client';
+import { useState, useCallback } from 'react';
 
 // Fetch current user's resume
 export function useResume() {
@@ -172,16 +173,21 @@ export function useResume() {
   });
 }
 
-// Upload resume with full cache invalidation
+// Upload resume with progress tracking and better error handling
 export function useUploadResume() {
   const queryClient = useQueryClient();
   const { refreshUser } = useAuth();
+  const [uploadProgress, setUploadProgress] = useState(0);
 
-  return useMutation({
-    mutationFn: async (file: { uri: string; name: string; type: string }) => {
-      return resumeApi.uploadResume(file);
+  const mutation = useMutation({
+    mutationFn: async (file: { uri: string; name: string; type: string; size?: number }) => {
+      setUploadProgress(0);
+      return resumeApi.uploadResume(file, {
+        onProgress: (progress) => setUploadProgress(progress),
+      });
     },
     onSuccess: async () => {
+      setUploadProgress(100);
       // Force invalidate ALL resume-related caches
       await queryClient.invalidateQueries({ queryKey: ['resume'] });
       await queryClient.invalidateQueries({ queryKey: ['profile'] });
@@ -191,6 +197,65 @@ export function useUploadResume() {
       queryClient.resetQueries({ queryKey: ['resume'] });
 
       // Refresh the user object in AuthContext
+      await refreshUser();
+    },
+    onError: () => {
+      setUploadProgress(0);
+    },
+    onSettled: () => {
+      // Reset progress after a delay to allow UI to show completion
+      setTimeout(() => setUploadProgress(0), 1000);
+    },
+  });
+
+  const resetProgress = useCallback(() => setUploadProgress(0), []);
+
+  return {
+    ...mutation,
+    uploadProgress,
+    resetProgress,
+  };
+}
+
+// Validate resume file before upload (can be called separately for early validation)
+export function validateResumeFile(file: { uri: string; name: string; type: string; size?: number }) {
+  try {
+    resumeApi.validateResumeFile(file);
+    return { valid: true, error: null };
+  } catch (error) {
+    if (error instanceof ResumeUploadError) {
+      return { valid: false, error: error.message, code: error.code };
+    }
+    return { valid: false, error: 'Invalid file', code: 'UNKNOWN' };
+  }
+}
+
+// Update resume fields manually
+export function useUpdateResume() {
+  const queryClient = useQueryClient();
+  const { refreshUser } = useAuth();
+
+  return useMutation({
+    mutationFn: async (data: {
+      full_name?: string;
+      email?: string;
+      phone?: string;
+      location?: string;
+      summary?: string;
+      linkedin_url?: string;
+      github_url?: string;
+      portfolio_url?: string;
+      skills?: string[];
+    }) => {
+      return resumeApi.updateResume(data);
+    },
+    onSuccess: async () => {
+      // Invalidate resume-related caches
+      await queryClient.invalidateQueries({ queryKey: ['resume'] });
+      await queryClient.invalidateQueries({ queryKey: ['profile'] });
+      await queryClient.invalidateQueries({ queryKey: ['auth'] });
+
+      // Refresh user
       await refreshUser();
     },
   });

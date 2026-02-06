@@ -108,10 +108,17 @@ export default function ProfileScreen() {
     }
   };
 
+  const [uploadModalVisible, setUploadModalVisible] = useState(false);
+
   const handleUploadResume = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+        type: [
+          'application/pdf',
+          'application/msword',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'text/plain',
+        ],
         copyToCacheDirectory: true,
       });
 
@@ -121,16 +128,63 @@ export default function ProfileScreen() {
 
       const file = result.assets[0];
 
+      // Show upload modal with progress
+      setUploadModalVisible(true);
+
       // Use the mutation hook which handles cache invalidation
       await uploadResume.mutateAsync({
         uri: file.uri,
         name: file.name,
         type: file.mimeType || 'application/pdf',
+        size: file.size,
       });
 
-      Alert.alert('Success', 'Resume uploaded and parsed successfully! View your resume to see the extracted data.');
+      setUploadModalVisible(false);
+      Alert.alert(
+        'Success',
+        'Resume uploaded and parsed successfully! View your resume to see the extracted data.',
+        [{ text: 'View Resume', onPress: handleViewResume }, { text: 'OK' }]
+      );
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to upload resume');
+      setUploadModalVisible(false);
+
+      // Provide specific guidance based on error type
+      const errorCode = error.code || 'UNKNOWN';
+      let title = 'Upload Failed';
+      let message = error.message || 'Failed to upload resume';
+      let buttons: any[] = [{ text: 'OK' }];
+
+      switch (errorCode) {
+        case 'FILE_TOO_LARGE':
+          title = 'File Too Large';
+          buttons = [
+            { text: 'Paste Text Instead', onPress: () => setPasteTextModalVisible(true) },
+            { text: 'OK' },
+          ];
+          break;
+        case 'INVALID_FILE_TYPE':
+          title = 'Invalid File Type';
+          message = 'Please upload a PDF, Word document (.doc, .docx), or text file.';
+          break;
+        case 'EXTRACTION_FAILED':
+          title = 'Could Not Read Resume';
+          message = 'We had trouble reading your resume. Complex PDF layouts or image-based resumes may not parse correctly.';
+          buttons = [
+            { text: 'Paste Text Instead', onPress: () => setPasteTextModalVisible(true) },
+            { text: 'Try Another File' },
+          ];
+          break;
+        case 'NETWORK_ERROR':
+          title = 'Connection Error';
+          message = 'Please check your internet connection and try again.';
+          break;
+        case 'TIMEOUT':
+          title = 'Upload Timed Out';
+          message = 'The upload took too long. Try a smaller file or check your connection.';
+          break;
+      }
+
+      Alert.alert(title, message, buttons);
     }
   };
 
@@ -744,6 +798,33 @@ export default function ProfileScreen() {
             </Button>
           </View>
         </Modal>
+
+        {/* Upload Progress Modal */}
+        <Modal
+          visible={uploadModalVisible}
+          dismissable={false}
+          contentContainerStyle={styles.uploadModalContent}
+        >
+          <View style={styles.uploadModalInner}>
+            <ActivityIndicator size="large" color="#3b82f6" style={styles.uploadSpinner} />
+            <Text variant="titleMedium" style={styles.uploadModalTitle}>
+              Uploading Resume
+            </Text>
+            <ProgressBar
+              progress={uploadResume.uploadProgress / 100}
+              color="#3b82f6"
+              style={styles.uploadProgressBar}
+            />
+            <Text variant="bodySmall" style={styles.uploadProgressText}>
+              {uploadResume.uploadProgress < 100
+                ? `${uploadResume.uploadProgress}% uploaded`
+                : 'Processing your resume...'}
+            </Text>
+            <Text variant="bodySmall" style={styles.uploadHint}>
+              This may take a moment while we extract your information.
+            </Text>
+          </View>
+        </Modal>
       </Portal>
     </ScrollView>
   );
@@ -1123,5 +1204,38 @@ const styles = StyleSheet.create({
   },
   pasteTextSubmitButton: {
     minWidth: 120,
+  },
+  // Upload progress modal styles
+  uploadModalContent: {
+    backgroundColor: '#fff',
+    margin: 32,
+    borderRadius: 16,
+    padding: 24,
+  },
+  uploadModalInner: {
+    alignItems: 'center',
+  },
+  uploadSpinner: {
+    marginBottom: 16,
+  },
+  uploadModalTitle: {
+    color: '#111827',
+    fontWeight: '600',
+    marginBottom: 16,
+  },
+  uploadProgressBar: {
+    width: '100%',
+    height: 8,
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  uploadProgressText: {
+    color: '#3b82f6',
+    fontWeight: '500',
+    marginBottom: 8,
+  },
+  uploadHint: {
+    color: '#9ca3af',
+    textAlign: 'center',
   },
 });

@@ -143,6 +143,20 @@ class ResumeUploadResponse(BaseModel):
     resume: ResumeResponse = Field(..., description="Parsed resume data")
 
 
+class ResumeUpdateRequest(BaseModel):
+    """Request to update resume fields manually."""
+
+    full_name: Optional[str] = Field(None, description="Full name")
+    email: Optional[str] = Field(None, description="Email address")
+    phone: Optional[str] = Field(None, description="Phone number")
+    location: Optional[str] = Field(None, description="Location")
+    summary: Optional[str] = Field(None, description="Professional summary")
+    linkedin_url: Optional[str] = Field(None, description="LinkedIn URL")
+    github_url: Optional[str] = Field(None, description="GitHub URL")
+    portfolio_url: Optional[str] = Field(None, description="Portfolio URL")
+    skills: Optional[List[str]] = Field(None, description="List of skills")
+
+
 class ResumeSummary(BaseModel):
     """Brief resume summary for listings."""
 
