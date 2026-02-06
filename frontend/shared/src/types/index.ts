@@ -694,3 +694,168 @@ export interface AutoApplyResult {
   messages: string[];
   errors: string[];
 }
+
+// ============= A/B Testing Types =============
+
+export type ABTestStatus = 'draft' | 'active' | 'paused' | 'completed';
+
+export interface ProposalVariant {
+  id: string;
+  user_id: string;
+  job_match_id?: string;
+  ab_test_id?: string;
+
+  // Content
+  content: string;
+  variant_name?: string;
+
+  // Generation parameters
+  tone?: string;
+  style?: string;
+  length?: string;
+  variant_label?: string; // "A" or "B"
+
+  // Metadata
+  generation_method?: string;
+  model_used?: string;
+  word_count?: number;
+  keywords_used: string[];
+  ats_score?: number;
+
+  // A/B Test tracking
+  is_control: boolean;
+  is_selected: boolean;
+
+  // Outcome tracking
+  was_sent: boolean;
+  sent_at?: string;
+  got_response: boolean;
+  response_at?: string;
+  got_interview: boolean;
+  interview_at?: string;
+  got_offer: boolean;
+  offer_at?: string;
+
+  // Computed
+  outcome_score: number;
+  days_to_response?: number;
+
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ABTestParameters {
+  variant_a?: Record<string, any>;
+  variant_b?: Record<string, any>;
+}
+
+export interface ABTestMetrics {
+  count: number;
+  sent: number;
+  responses: number;
+  interviews: number;
+  offers: number;
+  response_rate: number;
+  interview_rate: number;
+  offer_rate?: number;
+}
+
+export interface ABTestResults {
+  variant_a?: ABTestMetrics;
+  variant_b?: ABTestMetrics;
+  winner?: string;
+  completed_at?: string;
+}
+
+export interface ABTest {
+  id: string;
+  user_id: string;
+  name: string;
+  description?: string;
+  test_type: string;
+  status: ABTestStatus;
+
+  // Configuration
+  parameters: ABTestParameters;
+  target_sample_size: number;
+  current_sample_size_a: number;
+  current_sample_size_b: number;
+
+  // Timing
+  started_at?: string;
+  ended_at?: string;
+
+  // Results
+  results: ABTestResults;
+  winner_variant?: string;
+
+  // Computed metrics
+  variant_a_metrics: ABTestMetrics;
+  variant_b_metrics: ABTestMetrics;
+
+  // Variants (when fetched with details)
+  variants?: ProposalVariant[];
+
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ToneStyleStats {
+  total: number;
+  sent: number;
+  responses: number;
+  interviews: number;
+  offers: number;
+  response_rate: number;
+  interview_rate: number;
+}
+
+export interface VariantStats {
+  total_variants: number;
+  sent_count: number;
+  response_count: number;
+  interview_count: number;
+  offer_count: number;
+  response_rate: number;
+  interview_rate: number;
+  offer_rate: number;
+  by_tone: Record<string, ToneStyleStats>;
+  by_style: Record<string, ToneStyleStats>;
+}
+
+export interface ABTestCreateRequest {
+  name: string;
+  test_type: string;
+  description?: string;
+  parameters?: ABTestParameters;
+  target_sample_size?: number;
+}
+
+export interface VariantCreateRequest {
+  content: string;
+  job_match_id?: string;
+  ab_test_id?: string;
+  variant_name?: string;
+  variant_label?: string;
+  tone?: string;
+  style?: string;
+  length?: string;
+  generation_method?: string;
+  model_used?: string;
+  keywords_used?: string[];
+  ats_score?: number;
+  is_control?: boolean;
+}
+
+export interface GenerateABVariantsRequest {
+  job_match_id: string;
+  ab_test_id?: string;
+  variant_a_config: Record<string, any>;
+  variant_b_config: Record<string, any>;
+}
+
+export interface GenerateABVariantsResponse {
+  variant_a: ProposalVariant;
+  variant_b: ProposalVariant;
+  ab_test_id?: string;
+}

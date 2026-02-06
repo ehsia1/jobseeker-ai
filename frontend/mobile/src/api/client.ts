@@ -859,3 +859,124 @@ export const remindersApi = {
     });
   },
 };
+
+// A/B Testing types
+import type {
+  ABTest,
+  ABTestStatus,
+  ProposalVariant,
+  VariantStats,
+  GenerateABVariantsRequest,
+  GenerateABVariantsResponse,
+} from '@jobseeker/shared';
+
+export interface ABTestCreateRequest {
+  name: string;
+  description?: string;
+  test_type: string;
+  parameters?: Record<string, any>;
+  target_sample_size?: number;
+}
+
+export interface VariantCreateRequest {
+  content: string;
+  job_match_id?: string;
+  ab_test_id?: string;
+  variant_name?: string;
+  variant_label?: string;
+  tone?: string;
+  style?: string;
+  length?: string;
+  generation_method?: string;
+  model_used?: string;
+  keywords_used?: string[];
+  ats_score?: number;
+  is_control?: boolean;
+}
+
+// A/B Testing API
+export const abTestApi = {
+  // A/B Test CRUD
+  async createTest(request: ABTestCreateRequest): Promise<ABTest> {
+    return apiFetch('/ab-test/tests', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  },
+
+  async getTests(statusFilter?: ABTestStatus): Promise<ABTest[]> {
+    const params = statusFilter ? `?status_filter=${statusFilter}` : '';
+    return apiFetch(`/ab-test/tests${params}`);
+  },
+
+  async getTest(testId: string): Promise<ABTest> {
+    return apiFetch(`/ab-test/tests/${testId}`);
+  },
+
+  async startTest(testId: string): Promise<ABTest> {
+    return apiFetch(`/ab-test/tests/${testId}/start`, { method: 'POST' });
+  },
+
+  async pauseTest(testId: string): Promise<ABTest> {
+    return apiFetch(`/ab-test/tests/${testId}/pause`, { method: 'POST' });
+  },
+
+  async completeTest(testId: string): Promise<ABTest> {
+    return apiFetch(`/ab-test/tests/${testId}/complete`, { method: 'POST' });
+  },
+
+  async deleteTest(testId: string): Promise<void> {
+    return apiFetch(`/ab-test/tests/${testId}`, { method: 'DELETE' });
+  },
+
+  // Variants CRUD
+  async createVariant(request: VariantCreateRequest): Promise<ProposalVariant> {
+    return apiFetch('/ab-test/variants', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  },
+
+  async getVariants(params: { job_match_id?: string; ab_test_id?: string }): Promise<ProposalVariant[]> {
+    const searchParams = new URLSearchParams();
+    if (params.job_match_id) searchParams.set('job_match_id', params.job_match_id);
+    if (params.ab_test_id) searchParams.set('ab_test_id', params.ab_test_id);
+    return apiFetch(`/ab-test/variants?${searchParams.toString()}`);
+  },
+
+  async getVariant(variantId: string): Promise<ProposalVariant> {
+    return apiFetch(`/ab-test/variants/${variantId}`);
+  },
+
+  async selectVariant(variantId: string): Promise<ProposalVariant> {
+    return apiFetch(`/ab-test/variants/${variantId}/select`, { method: 'POST' });
+  },
+
+  async markVariantSent(variantId: string): Promise<ProposalVariant> {
+    return apiFetch(`/ab-test/variants/${variantId}/send`, { method: 'POST' });
+  },
+
+  async recordOutcome(variantId: string, outcomeType: 'response' | 'interview' | 'offer'): Promise<ProposalVariant> {
+    return apiFetch(`/ab-test/variants/${variantId}/outcome`, {
+      method: 'POST',
+      body: JSON.stringify({ outcome_type: outcomeType }),
+    });
+  },
+
+  async deleteVariant(variantId: string): Promise<void> {
+    return apiFetch(`/ab-test/variants/${variantId}`, { method: 'DELETE' });
+  },
+
+  // Analytics
+  async getStats(): Promise<VariantStats> {
+    return apiFetch('/ab-test/stats');
+  },
+
+  // Quick generate
+  async generateABVariants(request: GenerateABVariantsRequest): Promise<GenerateABVariantsResponse> {
+    return apiFetch('/ab-test/generate-ab', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  },
+};

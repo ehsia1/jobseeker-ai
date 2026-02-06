@@ -145,6 +145,7 @@ class JobMatch(Base):
     feedback = relationship("UserFeedback", back_populates="match", cascade="all, delete-orphan")
     timeline_entries = relationship("ApplicationTimeline", back_populates="job_match", cascade="all, delete-orphan", order_by="ApplicationTimeline.created_at")
     reminders = relationship("ApplicationReminder", back_populates="job_match", cascade="all, delete-orphan")
+    proposal_variants = relationship("ProposalVariant", back_populates="job_match", cascade="all, delete-orphan")
     
     @property
     def semantic_score(self) -> float:

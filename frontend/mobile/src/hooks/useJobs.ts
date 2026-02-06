@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { jobsApi, matchesApi, profileApi, usersApi, subscriptionApi } from '../api/client';
-import type { SearchQuery, JobMatchStatus, UserProfile, Resume, User, JobFilters } from '@jobseeker/shared';
+import { jobsApi, matchesApi, profileApi, usersApi, subscriptionApi, abTestApi } from '../api/client';
+import type { SearchQuery, JobMatchStatus, UserProfile, Resume, User, JobFilters, ABTestStatus, ABTestCreateRequest, VariantCreateRequest, GenerateABVariantsRequest } from '@jobseeker/shared';
 import { useAuth } from '../contexts/AuthContext';
 
 // Fetch jobs with infinite scroll
@@ -422,5 +422,181 @@ export function useDigestPreview() {
 export function useSendDigest() {
   return useMutation({
     mutationFn: () => digestApi.sendNow(),
+  });
+}
+
+// ============= A/B Testing Hooks =============
+
+// Fetch all A/B tests
+export function useABTests(statusFilter?: ABTestStatus) {
+  const { isAuthenticated } = useAuth();
+
+  return useQuery({
+    queryKey: ['abTests', statusFilter],
+    queryFn: () => abTestApi.getTests(statusFilter),
+    enabled: isAuthenticated,
+  });
+}
+
+// Fetch single A/B test with variants
+export function useABTest(testId: string) {
+  const { isAuthenticated } = useAuth();
+
+  return useQuery({
+    queryKey: ['abTests', testId],
+    queryFn: () => abTestApi.getTest(testId),
+    enabled: !!testId && isAuthenticated,
+  });
+}
+
+// Create A/B test
+export function useCreateABTest() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (request: ABTestCreateRequest) => abTestApi.createTest(request),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['abTests'] });
+    },
+  });
+}
+
+// Start A/B test
+export function useStartABTest() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (testId: string) => abTestApi.startTest(testId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['abTests'] });
+    },
+  });
+}
+
+// Pause A/B test
+export function usePauseABTest() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (testId: string) => abTestApi.pauseTest(testId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['abTests'] });
+    },
+  });
+}
+
+// Complete A/B test
+export function useCompleteABTest() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (testId: string) => abTestApi.completeTest(testId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['abTests'] });
+    },
+  });
+}
+
+// Delete A/B test
+export function useDeleteABTest() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (testId: string) => abTestApi.deleteTest(testId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['abTests'] });
+    },
+  });
+}
+
+// Fetch variants for job match or A/B test
+export function useVariants(jobMatchId?: string, abTestId?: string) {
+  const { isAuthenticated } = useAuth();
+
+  return useQuery({
+    queryKey: ['variants', { jobMatchId, abTestId }],
+    queryFn: () => abTestApi.getVariants({ job_match_id: jobMatchId, ab_test_id: abTestId }),
+    enabled: isAuthenticated && (!!jobMatchId || !!abTestId),
+  });
+}
+
+// Create variant
+export function useCreateVariant() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (request: VariantCreateRequest) => abTestApi.createVariant(request),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['variants'] });
+      if (variables.ab_test_id) {
+        queryClient.invalidateQueries({ queryKey: ['abTests', variables.ab_test_id] });
+      }
+    },
+  });
+}
+
+// Select variant (mark as chosen)
+export function useSelectVariant() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (variantId: string) => abTestApi.selectVariant(variantId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['variants'] });
+    },
+  });
+}
+
+// Mark variant as sent
+export function useMarkVariantSent() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (variantId: string) => abTestApi.markVariantSent(variantId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['variants'] });
+      queryClient.invalidateQueries({ queryKey: ['abTests'] });
+    },
+  });
+}
+
+// Record variant outcome
+export function useRecordOutcome() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ variantId, outcomeType }: { variantId: string; outcomeType: 'response' | 'interview' | 'offer' }) =>
+      abTestApi.recordOutcome(variantId, outcomeType),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['variants'] });
+      queryClient.invalidateQueries({ queryKey: ['abTests'] });
+      queryClient.invalidateQueries({ queryKey: ['variantStats'] });
+    },
+  });
+}
+
+// Fetch variant statistics
+export function useVariantStats() {
+  const { isAuthenticated } = useAuth();
+
+  return useQuery({
+    queryKey: ['variantStats'],
+    queryFn: () => abTestApi.getStats(),
+    enabled: isAuthenticated,
+  });
+}
+
+// Generate A/B variants for a job
+export function useGenerateABVariants() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (request: GenerateABVariantsRequest) => abTestApi.generateABVariants(request),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['variants'] });
+      if (variables.ab_test_id) {
+        queryClient.invalidateQueries({ queryKey: ['abTests', variables.ab_test_id] });
+      }
+    },
   });
 }

@@ -45,6 +45,8 @@ class User(Base):
     application_timeline = relationship("ApplicationTimeline", back_populates="user", cascade="all, delete-orphan")
     application_reminders = relationship("ApplicationReminder", back_populates="user", cascade="all, delete-orphan")
     preference_model = relationship("UserPreferenceModel", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    proposal_variants = relationship("ProposalVariant", back_populates="user", cascade="all, delete-orphan")
+    ab_tests = relationship("ABTest", back_populates="user", cascade="all, delete-orphan")
 
 
 class UserProfile(Base):

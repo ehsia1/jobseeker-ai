@@ -32,6 +32,13 @@ from backend.models.recommendation import (
     SimilarUserCluster,
     UserClusterMembership,
 )
+from backend.models.proposal import (
+    ProposalVariant,
+    ABTest,
+    ProposalTone,
+    ProposalStyle,
+    ABTestStatus,
+)
 
 __all__ = [
     "User",
@@ -61,4 +68,9 @@ __all__ = [
     "RecommendationLog",
     "SimilarUserCluster",
     "UserClusterMembership",
+    "ProposalVariant",
+    "ABTest",
+    "ProposalTone",
+    "ProposalStyle",
+    "ABTestStatus",
 ]

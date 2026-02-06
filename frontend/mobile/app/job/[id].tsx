@@ -28,6 +28,7 @@ import { useJob, useMatchesInfinite, useSaveJob, useUpdateMatchStatus } from '..
 import { useCoverLetter, useInterviewPrep, useSalaryResearch, useSkillGap, useNetworkIntelligence, useAutoApply } from '../../src/hooks/useAgent';
 import { ScoreBreakdownBar } from '../../src/components/ScoreBadge';
 import { AgentLoadingState } from '../../src/components/AgentLoadingState';
+import { ProposalABTest } from '../../src/components/ProposalABTest';
 import { matchesApi, proposalsApi } from '../../src/api/client';
 import type { ScoredJob, JobMatchStatus, InterviewQuestion, SalaryRange, SkillGapItem, CoverLetterStyle } from '@jobseeker/shared';
 
@@ -51,6 +52,7 @@ export default function JobDetailsScreen() {
   const [keyPoints, setKeyPoints] = useState<string[]>([]);
   const [coverLetterStyle, setCoverLetterStyle] = useState<CoverLetterStyle>('modern');
   const [styleMenuVisible, setStyleMenuVisible] = useState(false);
+  const [proposalMode, setProposalMode] = useState<'single' | 'ab'>('single');
   const [expandedQuestion, setExpandedQuestion] = useState<number | null>(null);
   const [fabOpen, setFabOpen] = useState(false);
 
@@ -607,7 +609,70 @@ export default function JobDetailsScreen() {
                 </Pressable>
               </View>
 
-              {proposal ? (
+              {/* Mode Toggle */}
+              {!proposal && (
+                <View style={styles.modeToggleContainer}>
+                  <Pressable
+                    style={[styles.modeToggle, proposalMode === 'single' && styles.modeToggleActive]}
+                    onPress={() => setProposalMode('single')}
+                  >
+                    <Ionicons name="document-text-outline" size={18} color={proposalMode === 'single' ? '#3b82f6' : '#6b7280'} />
+                    <Text style={[styles.modeToggleText, proposalMode === 'single' && styles.modeToggleTextActive]}>Single</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.modeToggle, proposalMode === 'ab' && styles.modeToggleActive]}
+                    onPress={() => setProposalMode('ab')}
+                  >
+                    <Ionicons name="git-compare-outline" size={18} color={proposalMode === 'ab' ? '#3b82f6' : '#6b7280'} />
+                    <Text style={[styles.modeToggleText, proposalMode === 'ab' && styles.modeToggleTextActive]}>A/B Test</Text>
+                  </Pressable>
+                </View>
+              )}
+
+              {/* A/B Test Mode */}
+              {proposalMode === 'ab' && !proposal && existingMatch && (
+                <ProposalABTest
+                  jobMatchId={existingMatch.id}
+                  onClose={() => {
+                    setShowProposalModal(false);
+                    setProposalMode('single');
+                  }}
+                  onMarkApplied={async (selectedVariant) => {
+                    if (!job || !existingMatch) return;
+                    try {
+                      await updateStatusMutation.mutateAsync({ matchId: existingMatch.id, status: 'applied' });
+                      setShowProposalModal(false);
+                      setProposalMode('single');
+                      Alert.alert('Success', 'Job marked as applied with your selected proposal!');
+                      router.back();
+                    } catch (err) {
+                      console.error('Failed to mark as applied:', err);
+                      Alert.alert('Error', 'Failed to mark as applied. Please try again.');
+                    }
+                  }}
+                />
+              )}
+
+              {/* Need to save job first for A/B mode */}
+              {proposalMode === 'ab' && !proposal && !existingMatch && (
+                <View style={styles.saveFirstContainer}>
+                  <Ionicons name="bookmark-outline" size={48} color="#6b7280" />
+                  <Text variant="bodyMedium" style={styles.saveFirstText}>
+                    Save this job first to use A/B testing
+                  </Text>
+                  <Button
+                    mode="contained"
+                    onPress={handleSave}
+                    loading={saveJobMutation.isPending}
+                    icon="bookmark"
+                  >
+                    Save Job
+                  </Button>
+                </View>
+              )}
+
+              {/* Single Mode - existing proposal display */}
+              {proposalMode === 'single' && proposal && (
                 <View style={styles.proposalContent}>
                   {/* Key Points if available */}
                   {keyPoints.length > 0 && (
@@ -655,7 +720,10 @@ export default function JobDetailsScreen() {
                     </Button>
                   </View>
                 </View>
-              ) : (
+              )}
+
+              {/* Single Mode - generate container */}
+              {proposalMode === 'single' && !proposal && (
                 <View style={styles.generateContainer}>
                   {/* Style Selection */}
                   <View style={styles.toneSelector}>
@@ -2936,5 +3004,48 @@ const styles = StyleSheet.create({
   },
   fabGroup: {
     paddingBottom: 0,
+  },
+  modeToggleContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#f3f4f6',
+    borderRadius: 8,
+    padding: 4,
+    marginBottom: 16,
+  },
+  modeToggle: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+  },
+  modeToggleActive: {
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  modeToggleText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6b7280',
+  },
+  modeToggleTextActive: {
+    color: '#3b82f6',
+  },
+  saveFirstContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+    gap: 16,
+  },
+  saveFirstText: {
+    color: '#6b7280',
+    textAlign: 'center',
   },
 });
